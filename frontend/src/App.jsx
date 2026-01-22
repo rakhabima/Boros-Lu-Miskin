@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { addExpense, deleteExpense, getExpenses } from "./api";
+import {
+  addExpense,
+  deleteExpense,
+  getCurrentUser,
+  getExpenses,
+  getGoogleAuthUrl,
+  logout,
+  signIn,
+  signUp
+} from "./api";
 
 const categories = ["All", "Food", "Transport", "Shopping", "Subscription", "Other"];
 
@@ -19,6 +28,14 @@ export default function App() {
 
   // Data
   const [expenses, setExpenses] = useState([]);
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authMode, setAuthMode] = useState("login");
+  const [authName, setAuthName] = useState("");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
 
   // Filters
   const [filterCategory, setFilterCategory] = useState("All");
@@ -30,12 +47,23 @@ export default function App() {
   const pageSize = 10;
 
   async function loadData() {
+    if (!user) return;
     setExpenses(await getExpenses());
   }
 
   useEffect(() => {
-    loadData();
+    async function loadUser() {
+      const current = await getCurrentUser();
+      setUser(current);
+      setAuthLoading(false);
+    }
+
+    loadUser();
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [user]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -73,6 +101,36 @@ export default function App() {
     await deleteExpense(deleteTarget.id);
     closeDeleteModal();
     loadData();
+  }
+
+  async function handleLogout() {
+    await logout();
+    setUser(null);
+    setExpenses([]);
+  }
+
+  async function handleAuthSubmit(e) {
+    e.preventDefault();
+    setAuthError("");
+    setAuthBusy(true);
+    try {
+      const payload = {
+        email: authEmail.trim(),
+        password: authPassword
+      };
+      if (authMode === "signup") {
+        payload.name = authName.trim();
+        const created = await signUp(payload);
+        setUser(created);
+      } else {
+        const signedIn = await signIn(payload);
+        setUser(signedIn);
+      }
+    } catch (err) {
+      setAuthError(err.message);
+    } finally {
+      setAuthBusy(false);
+    }
   }
 
   const filteredExpenses = useMemo(() => {
@@ -114,10 +172,157 @@ export default function App() {
     }, 0);
   }, [expenses]);
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-neutral-50 text-neutral-900 flex items-center justify-center">
+        <div className="text-sm text-neutral-500">Checking session...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-neutral-50 text-neutral-900 flex items-center">
+        <div className="max-w-3xl mx-auto px-6 w-full">
+          <div className="rounded-xl border border-neutral-200 bg-white p-6">
+            <h1 className="text-2xl font-semibold mb-2">
+              BOROS LU MISKIN!!!
+            </h1>
+            <p className="text-sm text-neutral-600 mb-4">
+              Catet pengeluaran Lo biar ga boros jon!
+            </p>
+            <div className="flex flex-col gap-4">
+              <div className="flex gap-2 text-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("login");
+                    setAuthError("");
+                  }}
+                  className={`rounded-md border px-3 py-2 ${
+                    authMode === "login"
+                      ? "border-neutral-900 bg-neutral-900 text-white"
+                      : "border-neutral-300"
+                  }`}
+                >
+                  Sign in
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("signup");
+                    setAuthError("");
+                  }}
+                  className={`rounded-md border px-3 py-2 ${
+                    authMode === "signup"
+                      ? "border-neutral-900 bg-neutral-900 text-white"
+                      : "border-neutral-300"
+                  }`}
+                >
+                  Sign up
+                </button>
+              </div>
+
+              <form onSubmit={handleAuthSubmit} className="grid gap-2">
+                {authMode === "signup" && (
+                  <input
+                    type="text"
+                    placeholder="Name"
+                    value={authName}
+                    onChange={(e) => setAuthName(e.target.value)}
+                    className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900/20"
+                    required
+                  />
+                )}
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900/20"
+                  required
+                />
+                <input
+                  type="password"
+                  placeholder="Password (min 8 characters)"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900/20"
+                  required
+                  minLength={8}
+                />
+                {authError && (
+                  <div className="text-sm text-red-600">{authError}</div>
+                )}
+                <button
+                  type="submit"
+                  disabled={authBusy}
+                  className="h-10 rounded-md border border-neutral-900 bg-neutral-900 text-sm font-medium text-white transition hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-neutral-900/30 disabled:opacity-60"
+                >
+                  {authMode === "signup" ? "Create account" : "Sign in"}
+                </button>
+              </form>
+
+              <div className="flex items-center gap-3 text-xs text-neutral-400">
+                <span className="h-px flex-1 bg-neutral-200" />
+                or
+                <span className="h-px flex-1 bg-neutral-200" />
+              </div>
+
+              <a
+                href={getGoogleAuthUrl()}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-neutral-300 bg-white px-4 text-sm font-medium text-neutral-900 transition hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-neutral-900/20"
+                aria-label="Continue with Google"
+              >
+                <svg
+                  aria-hidden="true"
+                  className="h-4 w-4"
+                  viewBox="0 0 48 48"
+                >
+                  <path
+                    fill="#FFC107"
+                    d="M43.6 20.5H42V20H24v8h11.3C33.9 32.5 29.4 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8.1 3.1l5.7-5.7C34.2 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c10.5 0 19-8.5 19-19 0-1.3-.1-2.1-.4-3.5z"
+                  />
+                  <path
+                    fill="#FF3D00"
+                    d="M6.3 14.7l6.6 4.8C14.7 16.1 19 12 24 12c3.1 0 5.9 1.2 8.1 3.1l5.7-5.7C34.2 6.1 29.3 4 24 4 16.3 4 9.6 8.3 6.3 14.7z"
+                  />
+                  <path
+                    fill="#4CAF50"
+                    d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.2C29.2 35.4 26.7 36 24 36c-5.4 0-9.9-3.4-11.5-8.1l-6.6 5.1C9.2 39.7 16.1 44 24 44z"
+                  />
+                  <path
+                    fill="#1976D2"
+                    d="M43.6 20.5H42V20H24v8h11.3c-1.1 3-3.5 5.4-6.8 6.6l6.3 5.2C38.8 36 43 30.6 43 24c0-1.3-.1-2.1-.4-3.5z"
+                  />
+                </svg>
+                Continue with Google
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900">
       <div className="max-w-5xl mx-auto px-6 py-10">
-        <h1 className="text-2xl font-semibold mb-8">Expense Tracker</h1>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-semibold">BOROS LU MISKIN!!!</h1>
+            <p className="text-sm text-neutral-600">
+              Signed in as {user.name}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="h-10 rounded-md border border-neutral-300 px-4 text-sm"
+          >
+            Log out
+          </button>
+        </div>
 
         {/* Add Expense */}
         <form
