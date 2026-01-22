@@ -14,6 +14,13 @@ export async function getExpenses() {
     return res.json();
 }
 
+export async function deleteExpense(id) {
+    const res = await fetch(`${API_URL}/expenses/${id}`, {
+        method: "DELETE"
+    });
+    return res.json();
+}
+
 export async function getSummary() {
     const res = await fetch(`${API_URL}/summary`);
     return res.json();
