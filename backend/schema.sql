@@ -21,3 +21,11 @@ ALTER TABLE expenses
 
 -- Optional: backfill or enforce non-null once all expenses have owners
 -- ALTER TABLE expenses ALTER COLUMN user_id SET NOT NULL;
+
+-- Track daily AI usage per user
+CREATE TABLE IF NOT EXISTS ai_usage (
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  usage_date DATE NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, usage_date)
+);
