@@ -81,8 +81,7 @@ insightsRouter.post(
       [req.user!.id, today]
     );
     const currentCount = usageResult.rows[0]?.count || 0;
-    const isDefaultRequest = Boolean(isDefault);
-    if (!isDefaultRequest && currentCount >= DAILY_LIMIT) {
+    if (!isDefault && currentCount >= DAILY_LIMIT) {
       return res
         .status(429)
         .json({ error: "Daily AI limit reached (10 requests)." });
@@ -90,7 +89,7 @@ insightsRouter.post(
 
     const userPrompt = prompt?.trim() || "Give me insights and tips.";
     const defaultMode =
-      isDefaultRequest ||
+      isDefault ||
       (userPrompt.toLowerCase() === defaultPrompt &&
         (!req.body.messages || req.body.messages.length === 0));
 
@@ -143,18 +142,6 @@ insightsRouter.post(
         content: String(msg.content || "")
       }));
 
-    const summaryText = usingGenericAdvice
-      ? "No expenses found."
-      : [
-          `Range: ${rangeLabel}`,
-          `Total: ${total}`,
-          "By category:",
-          ...categories.map(
-            (item: { category: string; total: number }) =>
-              `- ${item.category}: ${item.total}`
-          )
-        ].join("\n");
-
     const response = await fetch(`${config.ai.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
@@ -169,7 +156,7 @@ insightsRouter.post(
           {
             role: "system",
             content:
-              "You are a helpful budgeting coach. Use ONLY the provided spending data. If no expenses exist, give general advice. Keep it concise and use bullet points."
+              "You are a helpful budgeting coach. Use ONLY the provided spending data. If no expenses exist, give general advice. Keep it concise. Respond in short paragraphs only. Do not use bullet points or numbered lists."
           },
           {
             role: "user",
@@ -182,10 +169,6 @@ insightsRouter.post(
                 ? "No expenses found. Provide general financial advice."
                 : undefined
             })
-          },
-          {
-            role: "user",
-            content: `SPENDING SUMMARY\n${summaryText}`
           },
           ...safeMessages
         ],
@@ -219,21 +202,6 @@ insightsRouter.post(
         );
       }
     }
-    if (defaultMode) {
-      console.log("AI default summary", {
-        userId: req.user!.id,
-        rangeLabel,
-        total,
-        categories
-      });
-    }
-
-    res.json({
-      text,
-      total,
-      categories,
-      remaining,
-      debugSummary: { rangeLabel, total, categories }
-    });
+    res.json({ text, total, categories, remaining });
   })
 );

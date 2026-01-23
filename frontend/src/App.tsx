@@ -17,6 +17,7 @@ import { ExpenseTable } from "./components/ExpenseTable";
 import type { ChatMessage, Expense, User } from "./types";
 
 const categories = ["All", "Food", "Transport", "Shopping", "Subscription", "Other"];
+const rangePresetOptions = ["Last 7 days", "Last 30 days", "Last year"];
 
 function formatIDR(value: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -45,8 +46,9 @@ export default function App() {
 
   // Filters
   const [filterCategory, setFilterCategory] = useState("All");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [rangePreset, setRangePreset] = useState<
+    "Last 7 days" | "Last 30 days" | "Last year"
+  >("Last 7 days");
   const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null);
   const [viewTarget, setViewTarget] = useState<Expense | null>(null);
   const [editTarget, setEditTarget] = useState<Expense | null>(null);
@@ -68,6 +70,7 @@ export default function App() {
   const [insightLoading, setInsightLoading] = useState(false);
   const [insightError, setInsightError] = useState("");
   const [insightRemaining, setInsightRemaining] = useState<number | null>(null);
+  const [lastSentIndex, setLastSentIndex] = useState<number | null>(null);
 
   async function loadData() {
     if (!user) return;
@@ -181,20 +184,30 @@ export default function App() {
   }
 
   const filteredExpenses = useMemo(() => {
+    const now = new Date();
+    const rangeStart = new Date(now);
+    rangeStart.setHours(0, 0, 0, 0);
+    if (rangePreset === "Last 7 days") {
+      rangeStart.setDate(now.getDate() - 6);
+    } else if (rangePreset === "Last 30 days") {
+      rangeStart.setDate(now.getDate() - 29);
+    } else {
+      rangeStart.setFullYear(now.getFullYear() - 1);
+    }
+
     return expenses.filter((e) => {
       const d = new Date(e.created_at);
 
       if (filterCategory !== "All" && e.category !== filterCategory) return false;
-      if (startDate && d < new Date(startDate + "T00:00:00")) return false;
-      if (endDate && d > new Date(endDate + "T23:59:59")) return false;
+      if (d < rangeStart) return false;
 
       return true;
     });
-  }, [expenses, filterCategory, startDate, endDate]);
+  }, [expenses, filterCategory, rangePreset]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterCategory, startDate, endDate, expenses.length]);
+  }, [filterCategory, rangePreset, expenses.length]);
 
   const totalPages = Math.max(
     1,
@@ -316,29 +329,34 @@ export default function App() {
   }
 
   async function handleInsights() {
+    if (insightLoading) return;
+    const trimmedPrompt = insightPrompt.trim();
+    if (!trimmedPrompt) return;
     setInsightError("");
     setInsightLoading(true);
+    setInsightPrompt("");
     try {
       const nextMessages: ChatMessage[] = [
         ...insightMessages,
-        { role: "user", content: insightPrompt }
+        { role: "user", content: trimmedPrompt }
       ];
+      setInsightMessages(nextMessages);
+      setLastSentIndex(nextMessages.length - 1);
       const isDefault =
         insightMessages.length === 0 &&
-        insightPrompt.trim().toLowerCase() === defaultInsightPrompt;
+        trimmedPrompt.toLowerCase() === defaultInsightPrompt;
       const result = await getInsights({
         month: insightMonth,
         year: insightYear,
-        prompt: insightPrompt,
+        prompt: trimmedPrompt,
         messages: nextMessages,
         isDefault
       });
-      setInsightMessages([
-        ...nextMessages,
+      setInsightMessages((prev) => [
+        ...prev,
         { role: "assistant", content: result.text }
       ]);
       setInsightRemaining(result.remaining);
-      setInsightPrompt("");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to get insights";
       setInsightError(message);
@@ -435,7 +453,10 @@ export default function App() {
               )}
             </div>
 
-            <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4 text-sm space-y-3 max-h-[420px] overflow-y-auto">
+            <div
+              className="rounded-md border border-neutral-200 bg-neutral-50 p-4 text-sm space-y-3 max-h-[420px] overflow-y-auto"
+              aria-live="polite"
+            >
               {insightMessages.length === 0 && (
                 <div>Your AI insights will appear here.</div>
               )}
@@ -446,6 +467,10 @@ export default function App() {
                     msg.role === "user"
                       ? "ml-auto bg-white border border-neutral-200"
                       : "bg-neutral-900 text-white"
+                  } ${
+                    msg.role === "user" && index === lastSentIndex
+                      ? "chat-fade-in"
+                      : ""
                   }`}
                 >
                   <div className="text-xs uppercase tracking-wide opacity-70 mb-1">
@@ -454,6 +479,18 @@ export default function App() {
                   <div className="whitespace-pre-line">{msg.content}</div>
                 </div>
               ))}
+              {insightLoading && (
+                <div className="max-w-[60%] rounded-md px-3 py-2 bg-neutral-900 text-white chat-fade-in">
+                  <div className="text-xs uppercase tracking-wide opacity-70 mb-1">
+                    assistant
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="typing-dot">•</span>
+                    <span className="typing-dot typing-delay-1">•</span>
+                    <span className="typing-dot typing-delay-2">•</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <form
@@ -468,13 +505,15 @@ export default function App() {
                   type="text"
                   value={insightPrompt}
                   onChange={(e) => setInsightPrompt(e.target.value)}
-                  className="h-10 flex-1 rounded-md border border-neutral-300 bg-white px-3 text-sm"
+                  className="h-10 flex-1 rounded-md border border-neutral-300 bg-white px-3 text-sm disabled:opacity-60"
                   placeholder="Type a message..."
+                  disabled={insightLoading}
                 />
                 <button
                   type="submit"
-                  className="h-10 rounded-md bg-neutral-900 px-4 text-sm text-white inline-flex items-center gap-2"
+                  className="h-10 rounded-md bg-neutral-900 px-4 text-sm text-white inline-flex items-center gap-2 transition"
                   disabled={insightLoading || !insightPrompt.trim()}
+                  aria-busy={insightLoading}
                 >
                   <svg
                     aria-hidden="true"
@@ -544,25 +583,14 @@ export default function App() {
             className="w-full md:w-48"
           />
 
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="w-full md:w-auto rounded border border-neutral-300 bg-white px-3 py-2"
-          />
-
-          <span
-            aria-hidden="true"
-            className="hidden md:inline-block text-neutral-400"
-          >
-            -
-          </span>
-
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="w-full md:w-auto rounded border border-neutral-300 bg-white px-3 py-2"
+          <CategorySelect
+            label="Filter by date range"
+            value={rangePreset}
+            options={rangePresetOptions}
+            onChange={(value) =>
+              setRangePreset(value as "Last 7 days" | "Last 30 days" | "Last year")
+            }
+            className="w-full md:w-48"
           />
         </div>
 
