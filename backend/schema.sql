@@ -15,6 +15,16 @@ ALTER TABLE users
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS password_hash TEXT;
 
+-- Expenses table
+CREATE TABLE IF NOT EXISTS expenses (
+  id SERIAL PRIMARY KEY,
+  amount NUMERIC NOT NULL,
+  category TEXT NOT NULL,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  user_id INTEGER REFERENCES users(id)
+);
+
 -- Add user ownership to expenses
 ALTER TABLE expenses
   ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);

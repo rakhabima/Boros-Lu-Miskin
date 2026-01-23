@@ -1,6 +1,7 @@
 import type { Expense, InsightResponse, Summary, User } from "./types";
 
-const API_URL = "http://localhost:4000";
+const API_URL =
+  import.meta.env.VITE_API_BASE_URL?.toString() || "http://localhost:4000";
 
 const withAuth: RequestInit = {
     credentials: "include"
