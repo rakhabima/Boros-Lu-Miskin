@@ -133,7 +133,11 @@ insightsRouter.post(
         }
       }
     }
-    const messages = Array.isArray(req.body.messages) ? req.body.messages : [];
+    const messages: Array<{ role?: string; content?: unknown }> = Array.isArray(
+      req.body.messages
+    )
+      ? req.body.messages
+      : [];
     const safeMessages = messages
       .filter((msg) => msg && typeof msg.role === "string")
       .slice(-10)
