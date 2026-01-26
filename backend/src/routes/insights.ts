@@ -72,7 +72,10 @@ insightsRouter.post(
   asyncHandler(async (req: Request, res: Response) => {
     const { prompt, isDefault } = req.body;
     if (!config.ai.apiKey) {
-      return res.status(500).json({ error: "AI not configured" });
+      return res.status(500).json({
+        error: "AI not configured",
+        code: "AI_NOT_CONFIGURED"
+      });
     }
 
     const today = new Date().toISOString().slice(0, 10);
@@ -84,7 +87,11 @@ insightsRouter.post(
     if (!isDefault && currentCount >= DAILY_LIMIT) {
       return res
         .status(429)
-        .json({ error: "Daily AI limit reached (10 requests)." });
+        .json({
+          error: "Daily AI limit reached (10 requests).",
+          code: "RATE_LIMITED",
+          details: { limit: DAILY_LIMIT }
+        });
     }
 
     const userPrompt = prompt?.trim() || "Give me insights and tips.";
@@ -184,7 +191,10 @@ insightsRouter.post(
     if (!response.ok) {
       return res
         .status(response.status)
-        .json({ error: completion.error?.message || "AI request failed" });
+        .json({
+          error: completion.error?.message || "AI request failed",
+          code: "AI_REQUEST_FAILED"
+        });
     }
 
     const text = completion.choices?.[0]?.message?.content || "";

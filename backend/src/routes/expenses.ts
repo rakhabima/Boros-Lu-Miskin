@@ -15,9 +15,14 @@ expensesRouter.post(
     const { amount, category, notes } = req.body;
 
     if (!amount || !category) {
-      return res
-        .status(400)
-        .json({ error: "amount and category are required" });
+      const missingFields = [];
+      if (!amount) missingFields.push("amount");
+      if (!category) missingFields.push("category");
+      return res.status(400).json({
+        error: "Missing required fields",
+        code: "VALIDATION_ERROR",
+        details: { fields: missingFields }
+      });
     }
 
     const result = await pool.query(
@@ -87,7 +92,11 @@ expensesRouter.delete(
   asyncHandler(async (req: Request, res: Response) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) {
-      return res.status(400).json({ error: "invalid expense id" });
+      return res.status(400).json({
+        error: "Invalid expense id",
+        code: "INVALID_ID",
+        details: { field: "id" }
+      });
     }
 
     const result = await pool.query(
@@ -96,7 +105,10 @@ expensesRouter.delete(
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "expense not found" });
+      return res.status(404).json({
+        error: "Expense not found",
+        code: "NOT_FOUND"
+      });
     }
 
     res.json(result.rows[0]);
@@ -112,14 +124,23 @@ expensesRouter.put(
   asyncHandler(async (req: Request, res: Response) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) {
-      return res.status(400).json({ error: "invalid expense id" });
+      return res.status(400).json({
+        error: "Invalid expense id",
+        code: "INVALID_ID",
+        details: { field: "id" }
+      });
     }
 
     const { amount, category, notes } = req.body;
     if (!amount || !category) {
-      return res
-        .status(400)
-        .json({ error: "amount and category are required" });
+      const missingFields = [];
+      if (!amount) missingFields.push("amount");
+      if (!category) missingFields.push("category");
+      return res.status(400).json({
+        error: "Missing required fields",
+        code: "VALIDATION_ERROR",
+        details: { fields: missingFields }
+      });
     }
 
     const result = await pool.query(
@@ -131,7 +152,10 @@ expensesRouter.put(
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "expense not found" });
+      return res.status(404).json({
+        error: "Expense not found",
+        code: "NOT_FOUND"
+      });
     }
 
     res.json(result.rows[0]);

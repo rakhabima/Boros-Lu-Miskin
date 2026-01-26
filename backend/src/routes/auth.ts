@@ -34,7 +34,10 @@ authRouter.post("/logout", (req: Request, res: Response, next: NextFunction) => 
 
 authRouter.get("/me", (req: Request, res: Response) => {
   if (!req.user) {
-    return res.status(401).json({ error: "Unauthorized" });
+    return res.status(401).json({
+      error: "Unauthorized",
+      code: "UNAUTHORIZED"
+    });
   }
   res.json(req.user);
 });
@@ -43,11 +46,22 @@ authRouter.post(
   "/signup",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     const { email, password, name } = req.body;
-    if (!email || !password || !name) {
-      return res.status(400).json({ error: "email, password, name required" });
+    const missingFields = ["email", "password", "name"].filter(
+      (field) => !req.body?.[field]
+    );
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        error: "Missing required fields",
+        code: "VALIDATION_ERROR",
+        details: { fields: missingFields }
+      });
     }
     if (password.length < 8) {
-      return res.status(400).json({ error: "password too short" });
+      return res.status(400).json({
+        error: "Password too short",
+        code: "VALIDATION_ERROR",
+        details: { field: "password", minLength: 8 }
+      });
     }
 
     const existing = await pool.query(
@@ -59,7 +73,10 @@ authRouter.post(
 
     if (existing.rows.length > 0) {
       if (existing.rows[0].password_hash) {
-        return res.status(409).json({ error: "email already registered" });
+        return res.status(409).json({
+          error: "Email already registered",
+          code: "EMAIL_IN_USE"
+        });
       }
 
       const hash = await bcrypt.hash(password, 10);
@@ -96,8 +113,15 @@ authRouter.post(
   "/login",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: "email and password required" });
+    const missingFields = ["email", "password"].filter(
+      (field) => !req.body?.[field]
+    );
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        error: "Missing required fields",
+        code: "VALIDATION_ERROR",
+        details: { fields: missingFields }
+      });
     }
 
     const result = await pool.query(
@@ -108,12 +132,18 @@ authRouter.post(
     );
 
     if (result.rows.length === 0 || !result.rows[0].password_hash) {
-      return res.status(401).json({ error: "invalid credentials" });
+      return res.status(401).json({
+        error: "Invalid credentials",
+        code: "INVALID_CREDENTIALS"
+      });
     }
 
     const ok = await bcrypt.compare(password, result.rows[0].password_hash);
     if (!ok) {
-      return res.status(401).json({ error: "invalid credentials" });
+      return res.status(401).json({
+        error: "Invalid credentials",
+        code: "INVALID_CREDENTIALS"
+      });
     }
 
     const user = {

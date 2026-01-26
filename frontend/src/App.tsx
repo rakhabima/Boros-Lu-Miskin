@@ -17,7 +17,7 @@ import { ExpenseTable } from "./components/ExpenseTable";
 import type { ChatMessage, Expense, User } from "./types";
 
 const categories = ["All", "Food", "Transport", "Shopping", "Subscription", "Other"];
-const rangePresetOptions = ["Last 7 days", "Last 30 days", "Last year"];
+const rangePresetOptions = ["Last 7 days", "Last 30 days", "Last 365 days"];
 
 function formatIDR(value: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -43,6 +43,7 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
+  const [expensesError, setExpensesError] = useState("");
 
   // Filters
   const [filterCategory, setFilterCategory] = useState("All");
@@ -74,14 +75,33 @@ export default function App() {
 
   async function loadData() {
     if (!user) return;
-    setExpenses(await getExpenses());
+    setExpensesError("");
+    try {
+      setExpenses(await getExpenses());
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to load expenses";
+      setExpensesError(message);
+      const status = (err as { status?: unknown })?.status;
+      if (status === 401) {
+        setUser(null);
+      }
+    }
   }
 
   useEffect(() => {
     async function loadUser() {
-      const current = await getCurrentUser();
-      setUser(current);
-      setAuthLoading(false);
+      try {
+        const current = await getCurrentUser();
+        setUser(current);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to load session";
+        setAuthError(message);
+        setUser(null);
+      } finally {
+        setAuthLoading(false);
+      }
     }
 
     loadUser();
@@ -95,15 +115,22 @@ export default function App() {
     e.preventDefault();
     if (!amount) return;
 
-    await addExpense({
-      amount: Number(amount),
-      category,
-      notes
-    });
+    setExpensesError("");
+    try {
+      await addExpense({
+        amount: Number(amount),
+        category,
+        notes
+      });
 
-    setAmount("");
-    setNotes("");
-    loadData();
+      setAmount("");
+      setNotes("");
+      loadData();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to add expense";
+      setExpensesError(message);
+    }
   }
 
   function openDeleteModal(expense: Expense) {
@@ -135,27 +162,48 @@ export default function App() {
 
   async function confirmDelete() {
     if (!deleteTarget) return;
-    await deleteExpense(deleteTarget.id);
-    closeDeleteModal();
-    loadData();
+    setExpensesError("");
+    try {
+      await deleteExpense(deleteTarget.id);
+      closeDeleteModal();
+      loadData();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to delete expense";
+      setExpensesError(message);
+    }
   }
 
   async function confirmEdit() {
     if (!editTarget || !editAmount) return;
-    await updateExpense(editTarget.id, {
-      amount: Number(editAmount),
-      category: editCategory,
-      notes: editNotes
-    });
-    closeEditModal();
-    closeViewModal();
-    loadData();
+    setExpensesError("");
+    try {
+      await updateExpense(editTarget.id, {
+        amount: Number(editAmount),
+        category: editCategory,
+        notes: editNotes
+      });
+      closeEditModal();
+      closeViewModal();
+      loadData();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to update expense";
+      setExpensesError(message);
+    }
   }
 
   async function handleLogout() {
-    await logout();
-    setUser(null);
-    setExpenses([]);
+    setExpensesError("");
+    try {
+      await logout();
+      setUser(null);
+      setExpenses([]);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to log out";
+      setExpensesError(message);
+    }
   }
 
   async function handleAuthSubmit(e: FormEvent<HTMLFormElement>) {
@@ -593,6 +641,10 @@ export default function App() {
             className="w-full md:w-48"
           />
         </div>
+
+        {expensesError && (
+          <div className="mb-4 text-sm text-red-600">{expensesError}</div>
+        )}
 
         <div className="mb-6 rounded-lg border border-neutral-200 bg-white p-4">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
