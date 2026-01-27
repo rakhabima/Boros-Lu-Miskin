@@ -48,9 +48,13 @@ const isHttps =
   config.origins.frontend.startsWith("https://") &&
   config.origins.backend.startsWith("https://");
 
+// Behind Nginx TLS termination, trust X-Forwarded-* headers for secure cookies.
+app.set("trust proxy", 1);
+
 app.use(
   session({
     secret: config.session.secret,
+    proxy: true,
     resave: false,
     saveUninitialized: false,
     cookie: {
