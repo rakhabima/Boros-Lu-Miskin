@@ -11,13 +11,42 @@ import { errorHandler } from "./middleware/error.js";
 
 const app = express();
 
+const normalizeOrigin = (origin: string) => origin.replace(/\/$/, "");
+
+const rawAllowedOrigins = config.origins.frontend
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean)
+  .map(normalizeOrigin);
+
+const allowedOrigins = new Set<string>();
+
+for (const origin of rawAllowedOrigins) {
+  allowedOrigins.add(origin);
+  if (origin.startsWith("http://")) {
+    if (origin.endsWith(":80")) {
+      allowedOrigins.add(origin.replace(/:80$/, ""));
+    } else if (!origin.includes(":", "http://".length)) {
+      allowedOrigins.add(`${origin}:80`);
+    }
+  }
+}
+
 app.use(
   cors({
-    origin: config.origins.frontend,
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.has(origin)) return callback(null, true);
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true
   })
 );
 app.use(express.json());
+
+const isHttps =
+  config.origins.frontend.startsWith("https://") &&
+  config.origins.backend.startsWith("https://");
 
 app.use(
   session({
@@ -27,7 +56,7 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: config.session.isProd
+      secure: isHttps
     }
   })
 );
