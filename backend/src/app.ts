@@ -14,13 +14,18 @@ const app = express();
 
 const normalizeOrigin = (origin: string) => origin.replace(/\/$/, "");
 
+const explicitAllowedOrigins = ["https://no-boros.rakhbim-project.my.id"];
 const rawAllowedOrigins = config.origins.frontend
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean)
-  .map(normalizeOrigin);
+  .map(normalizeOrigin)
+  .filter((origin) => !origin.includes("localhost") && !origin.includes("127.0.0.1"));
 
-const allowedOrigins = new Set<string>(rawAllowedOrigins);
+const allowedOrigins = new Set<string>([
+  ...explicitAllowedOrigins.map(normalizeOrigin),
+  ...rawAllowedOrigins
+]);
 
 app.use(
   cors({
@@ -65,7 +70,7 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: isHttps
+      secure: true
     }
   })
 );

@@ -18,7 +18,14 @@ authRouter.get(
   passport.authenticate("google", {
     failureRedirect: `${config.origins.frontend}/login?error=oauth`
   }),
-  (req: Request, res: Response) => {
+  (req: Request, res: Response, next: NextFunction) => {
+    if (req.user?.id && req.session) {
+      req.session.userId = req.user.id;
+      return req.session.save((err) => {
+        if (err) return next(err);
+        res.redirect(config.origins.frontend);
+      });
+    }
     res.redirect(config.origins.frontend);
   }
 );
@@ -38,7 +45,21 @@ authRouter.post("/logout", (req: Request, res: Response, next: NextFunction) => 
   });
 });
 
-authRouter.get("/me", (req: Request, res: Response) => {
+authRouter.get("/me", async (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user && req.session?.userId) {
+    try {
+      const result = await pool.query(
+        `SELECT id, google_id, email, name, avatar_url FROM users WHERE id = $1`,
+        [req.session.userId]
+      );
+      if (result.rows.length > 0) {
+        req.user = result.rows[0];
+      }
+    } catch (err) {
+      return next(err);
+    }
+  }
+
   if (!req.user) {
     console.log("[SESSION DEBUG] /auth/me unauthorized", {
       request_id: req.requestId,
@@ -123,6 +144,7 @@ authRouter.post(
 
       return req.login(updated.rows[0], (err) => {
         if (err) return next(err);
+        req.session.userId = updated.rows[0].id;
         req.session.save((saveErr) => {
           if (saveErr) return next(saveErr);
           respondSuccess(res, req, {
@@ -145,6 +167,7 @@ authRouter.post(
 
     return req.login(created.rows[0], (err) => {
       if (err) return next(err);
+      req.session.userId = created.rows[0].id;
       req.session.save((saveErr) => {
         if (saveErr) return next(saveErr);
         respondSuccess(res, req, {
@@ -218,6 +241,7 @@ authRouter.post(
 
     return req.login(user, (err) => {
       if (err) return next(err);
+      req.session.userId = user.id;
       req.session.save((saveErr) => {
         if (saveErr) return next(saveErr);
         console.log("[SESSION DEBUG] /auth/login after", {

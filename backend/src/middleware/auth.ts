@@ -1,12 +1,14 @@
 import type { NextFunction, Request, Response } from "express";
 import { respondError } from "../utils/response.js";
+import { pool } from "../db.js";
 
-export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
+export const requireAuth = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   const session = req.session;
   const sessionId = req.sessionID;
-  const hasPassportUser =
-    typeof (session as { passport?: { user?: unknown } })?.passport?.user !==
-    "undefined";
 
   if (!session) {
     console.log("[AUTH DEBUG] requireAuth no session", {
@@ -37,8 +39,9 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
     });
   }
 
-  if (!req.user && !hasPassportUser) {
-    console.log("[AUTH DEBUG] requireAuth missing passport user", {
+  const userId = session.userId;
+  if (!userId) {
+    console.log("[AUTH DEBUG] requireAuth missing session userId", {
       request_id: req.requestId,
       sessionID: sessionId,
       sessionKeys
@@ -46,24 +49,36 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
     return respondError(res, req, {
       status: 401,
       code: "AUTH_SESSION_NO_USER",
-      message: "Session exists but no authenticated user found",
+      message: "Session exists but missing user identifier",
       details: { session_id: sessionId, session_keys: sessionKeys },
       authenticated: false
     });
   }
 
-  if (!req.user && hasPassportUser) {
-    console.log("[AUTH DEBUG] requireAuth passport user not deserialized", {
-      request_id: req.requestId,
-      sessionID: sessionId
-    });
-    return respondError(res, req, {
-      status: 401,
-      code: "AUTH_DESERIALIZE_FAILED",
-      message: "Session contains auth data but user is not deserialized",
-      details: { session_id: sessionId },
-      authenticated: false
-    });
+  if (!req.user) {
+    try {
+      const result = await pool.query(
+        `SELECT id, google_id, email, name, avatar_url FROM users WHERE id = $1`,
+        [userId]
+      );
+      if (result.rows.length === 0) {
+        console.log("[AUTH DEBUG] requireAuth userId not found", {
+          request_id: req.requestId,
+          sessionID: sessionId,
+          userId
+        });
+        return respondError(res, req, {
+          status: 401,
+          code: "AUTH_SESSION_USER_NOT_FOUND",
+          message: "Session contains userId but user no longer exists",
+          details: { session_id: sessionId, user_id: userId },
+          authenticated: false
+        });
+      }
+      req.user = result.rows[0];
+    } catch (err) {
+      return next(err);
+    }
   }
 
   console.log("[AUTH DEBUG] requireAuth authorized", {
