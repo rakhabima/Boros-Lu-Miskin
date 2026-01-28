@@ -90,7 +90,10 @@ authRouter.post(
 
       return req.login(updated.rows[0], (err) => {
         if (err) return next(err);
-        res.json(updated.rows[0]);
+        req.session.save((saveErr) => {
+          if (saveErr) return next(saveErr);
+          res.json(updated.rows[0]);
+        });
       });
     }
 
@@ -104,7 +107,10 @@ authRouter.post(
 
     return req.login(created.rows[0], (err) => {
       if (err) return next(err);
-      res.json(created.rows[0]);
+      req.session.save((saveErr) => {
+        if (saveErr) return next(saveErr);
+        res.json(created.rows[0]);
+      });
     });
   })
 );
@@ -156,7 +162,10 @@ authRouter.post(
 
     return req.login(user, (err) => {
       if (err) return next(err);
-      res.json(user);
+      req.session.save((saveErr) => {
+        if (saveErr) return next(saveErr);
+        res.json(user);
+      });
     });
   })
 );
