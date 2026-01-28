@@ -20,24 +20,17 @@ const rawAllowedOrigins = config.origins.frontend
   .filter(Boolean)
   .map(normalizeOrigin);
 
-const allowedOrigins = new Set<string>();
-
-for (const origin of rawAllowedOrigins) {
-  allowedOrigins.add(origin);
-  if (origin.startsWith("http://")) {
-    if (origin.endsWith(":80")) {
-      allowedOrigins.add(origin.replace(/:80$/, ""));
-    } else if (!origin.includes(":", "http://".length)) {
-      allowedOrigins.add(`${origin}:80`);
-    }
-  }
-}
+const allowedOrigins = new Set<string>(rawAllowedOrigins);
 
 app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       if (allowedOrigins.has(origin)) return callback(null, true);
+      console.error("[CORS] blocked origin", {
+        origin,
+        allowed: Array.from(allowedOrigins)
+      });
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true
