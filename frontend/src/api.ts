@@ -9,6 +9,7 @@ const withAuth: RequestInit = {
 
 type ApiErrorPayload = {
   error?: string;
+  message?: string;
   code?: string;
   details?: unknown;
 };
@@ -33,7 +34,8 @@ function formatApiErrorMessage(
   res: Response,
   payload: ApiErrorPayload | null
 ) {
-  const base = payload?.error || res.statusText || "Request failed";
+  const base =
+    payload?.message || payload?.error || res.statusText || "Request failed";
   const code = payload?.code ? ` (${payload.code})` : "";
   return `${base}${code} (status ${res.status})`;
 }
@@ -55,6 +57,22 @@ async function parseResponse<T>(res: Response): Promise<T> {
   return data as T;
 }
 
+type ApiEnvelope<T> = {
+  success: boolean;
+  code: string;
+  message: string;
+  data?: T;
+  meta?: {
+    request_id?: string;
+    timestamp?: string;
+    authenticated?: boolean;
+  };
+};
+
+async function parseEnvelope<T>(res: Response): Promise<ApiEnvelope<T>> {
+  return parseResponse<ApiEnvelope<T>>(res);
+}
+
 export function getGoogleAuthUrl() {
   return `${API_URL}/auth/google`;
 }
@@ -74,7 +92,11 @@ export async function signUp({
     body: JSON.stringify({ email, password, name }),
     ...withAuth
   });
-  return parseResponse<User>(res);
+  const envelope = await parseEnvelope<{ user: User }>(res);
+  if (!envelope.data?.user) {
+    throw new Error("Missing user in signup response");
+  }
+  return envelope.data.user;
 }
 
 export async function signIn({
@@ -90,13 +112,18 @@ export async function signIn({
     body: JSON.stringify({ email, password }),
     ...withAuth
   });
-  return parseResponse<User>(res);
+  const envelope = await parseEnvelope<{ user: User }>(res);
+  if (!envelope.data?.user) {
+    throw new Error("Missing user in login response");
+  }
+  return envelope.data.user;
 }
 
 export async function getCurrentUser(): Promise<User | null> {
   const res = await fetch(`${API_URL}/auth/me`, withAuth);
   if (res.status === 401) return null;
-  return parseResponse<User>(res);
+  const envelope = await parseEnvelope<{ user: User }>(res);
+  return envelope.data?.user ?? null;
 }
 
 export async function logout(): Promise<{ ok: boolean }> {
@@ -104,7 +131,11 @@ export async function logout(): Promise<{ ok: boolean }> {
     method: "POST",
     ...withAuth
   });
-  return parseResponse<{ ok: boolean }>(res);
+  const envelope = await parseEnvelope<{ ok: boolean }>(res);
+  if (!envelope.data) {
+    throw new Error("Missing logout response data");
+  }
+  return envelope.data;
 }
 
 export async function addExpense(data: {
@@ -118,12 +149,18 @@ export async function addExpense(data: {
     body: JSON.stringify(data),
     ...withAuth
   });
-  return parseResponse<Expense>(res);
+  const envelope = await parseEnvelope<{ expense: Expense }>(res);
+  if (!envelope.data?.expense) {
+    throw new Error("Missing expense in create response");
+  }
+  return envelope.data.expense;
 }
 
 export async function getExpenses(): Promise<Expense[]> {
   const res = await fetch(`${API_URL}/expenses`, withAuth);
-  return parseResponse<Expense[]>(res);
+  const envelope = await parseEnvelope<{ expenses: Expense[] }>(res);
+  const expenses = envelope.data?.expenses;
+  return Array.isArray(expenses) ? expenses : [];
 }
 
 export async function deleteExpense(id: number): Promise<Expense> {
@@ -131,7 +168,11 @@ export async function deleteExpense(id: number): Promise<Expense> {
     method: "DELETE",
     ...withAuth
   });
-  return parseResponse<Expense>(res);
+  const envelope = await parseEnvelope<{ expense: Expense }>(res);
+  if (!envelope.data?.expense) {
+    throw new Error("Missing expense in delete response");
+  }
+  return envelope.data.expense;
 }
 
 export async function updateExpense(
@@ -144,12 +185,20 @@ export async function updateExpense(
     body: JSON.stringify(data),
     ...withAuth
   });
-  return parseResponse<Expense>(res);
+  const envelope = await parseEnvelope<{ expense: Expense }>(res);
+  if (!envelope.data?.expense) {
+    throw new Error("Missing expense in update response");
+  }
+  return envelope.data.expense;
 }
 
 export async function getSummary(): Promise<Summary> {
   const res = await fetch(`${API_URL}/summary`, withAuth);
-  return parseResponse<Summary>(res);
+  const envelope = await parseEnvelope<Summary>(res);
+  if (!envelope.data) {
+    throw new Error("Missing summary response data");
+  }
+  return envelope.data;
 }
 
 export async function getInsights(payload: {
@@ -165,5 +214,9 @@ export async function getInsights(payload: {
     body: JSON.stringify(payload),
     ...withAuth
   });
-  return parseResponse<InsightResponse>(res);
+  const envelope = await parseEnvelope<InsightResponse>(res);
+  if (!envelope.data) {
+    throw new Error("Missing insights response data");
+  }
+  return envelope.data;
 }
