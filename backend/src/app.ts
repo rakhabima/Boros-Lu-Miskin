@@ -1,4 +1,5 @@
 import express from "express";
+import { randomUUID } from "crypto";
 import cors from "cors";
 import session from "express-session";
 import passport from "passport";
@@ -43,6 +44,17 @@ app.use(
   })
 );
 app.use(express.json());
+
+app.use((req, res, next) => {
+  req.requestId = randomUUID();
+  res.setHeader("X-Request-Id", req.requestId);
+  console.log("[REQUEST] start", {
+    request_id: req.requestId,
+    method: req.method,
+    path: req.path
+  });
+  next();
+});
 
 const isHttps =
   config.origins.frontend.startsWith("https://") &&

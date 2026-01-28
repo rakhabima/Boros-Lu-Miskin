@@ -3,6 +3,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { pool } from "../db.js";
 import { config } from "../config.js";
+import { respondError, respondSuccess } from "../utils/response.js";
 
 export const insightsRouter = Router();
 
@@ -72,9 +73,12 @@ insightsRouter.post(
   asyncHandler(async (req: Request, res: Response) => {
     const { prompt, isDefault } = req.body;
     if (!config.ai.apiKey) {
-      return res.status(500).json({
-        error: "AI not configured",
-        code: "AI_NOT_CONFIGURED"
+      return respondError(res, req, {
+        status: 500,
+        code: "AI_NOT_CONFIGURED",
+        message: "AI is not configured on the server",
+        details: { provider: "openrouter" },
+        authenticated: true
       });
     }
 
@@ -85,13 +89,13 @@ insightsRouter.post(
     );
     const currentCount = usageResult.rows[0]?.count || 0;
     if (!isDefault && currentCount >= DAILY_LIMIT) {
-      return res
-        .status(429)
-        .json({
-          error: "Daily AI limit reached (10 requests).",
-          code: "RATE_LIMITED",
-          details: { limit: DAILY_LIMIT }
-        });
+      return respondError(res, req, {
+        status: 429,
+        code: "AI_RATE_LIMITED",
+        message: "Daily AI limit reached",
+        details: { limit: DAILY_LIMIT },
+        authenticated: true
+      });
     }
 
     const userPrompt = prompt?.trim() || "Give me insights and tips.";
@@ -189,12 +193,13 @@ insightsRouter.post(
 
     const completion = await response.json();
     if (!response.ok) {
-      return res
-        .status(response.status)
-        .json({
-          error: completion.error?.message || "AI request failed",
-          code: "AI_REQUEST_FAILED"
-        });
+      return respondError(res, req, {
+        status: response.status,
+        code: "AI_REQUEST_FAILED",
+        message: completion.error?.message || "AI request failed",
+        details: { status: response.status },
+        authenticated: true
+      });
     }
 
     const text = completion.choices?.[0]?.message?.content || "";
@@ -216,6 +221,11 @@ insightsRouter.post(
         );
       }
     }
-    res.json({ text, total, categories, remaining });
+    return respondSuccess(res, req, {
+      code: "AI_INSIGHTS_SUCCESS",
+      message: "AI insights generated successfully",
+      data: { text, total, categories, remaining },
+      authenticated: true
+    });
   })
 );

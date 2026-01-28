@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { config } from "../config.js";
+import { respondError } from "../utils/response.js";
 
 type HttpError = Error & {
   status?: number;
@@ -13,7 +14,10 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  console.error(err);
+  console.error("[ERROR]", {
+    request_id: req.requestId,
+    message: err.message
+  });
   const httpError = err as HttpError;
   const status =
     typeof httpError.status === "number" ? httpError.status : 500;
@@ -34,5 +38,15 @@ export const errorHandler = (
     }
   }
 
-  res.status(status).json(payload);
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  return respondError(res, req, {
+    status,
+    code: httpError.code || "INTERNAL_ERROR",
+    message: payload.error,
+    details: payload.details,
+    authenticated: Boolean(req.user)
+  });
 };

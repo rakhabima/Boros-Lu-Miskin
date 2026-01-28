@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { pool } from "../db.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { respondError, respondSuccess } from "../utils/response.js";
 
 export const expensesRouter = Router();
 
@@ -18,10 +19,12 @@ expensesRouter.post(
       const missingFields = [];
       if (!amount) missingFields.push("amount");
       if (!category) missingFields.push("category");
-      return res.status(400).json({
-        error: "Missing required fields",
-        code: "VALIDATION_ERROR",
-        details: { fields: missingFields }
+      return respondError(res, req, {
+        status: 400,
+        code: "EXPENSE_CREATE_VALIDATION_FAILED",
+        message: "Missing required fields",
+        details: { fields: missingFields },
+        authenticated: true
       });
     }
 
@@ -32,7 +35,13 @@ expensesRouter.post(
       [amount, category, notes || null, req.user!.id]
     );
 
-    res.json(result.rows[0]);
+    return respondSuccess(res, req, {
+      status: 201,
+      code: "EXPENSE_CREATE_SUCCESS",
+      message: "Expense created successfully",
+      data: { expense: result.rows[0] },
+      authenticated: true
+    });
   })
 );
 
@@ -50,7 +59,12 @@ expensesRouter.get(
        ORDER BY created_at DESC`,
       [req.user!.id]
     );
-    res.json(result.rows);
+    return respondSuccess(res, req, {
+      code: "EXPENSE_LIST_SUCCESS",
+      message: "Expenses retrieved successfully",
+      data: { expenses: result.rows },
+      authenticated: true
+    });
   })
 );
 
@@ -76,9 +90,14 @@ expensesRouter.get(
       [req.user!.id]
     );
 
-    res.json({
-      total: totalResult.rows[0].total,
-      byCategory: byCategoryResult.rows
+    return respondSuccess(res, req, {
+      code: "EXPENSE_SUMMARY_SUCCESS",
+      message: "Expense summary retrieved successfully",
+      data: {
+        total: totalResult.rows[0].total,
+        byCategory: byCategoryResult.rows
+      },
+      authenticated: true
     });
   })
 );
@@ -92,10 +111,12 @@ expensesRouter.delete(
   asyncHandler(async (req: Request, res: Response) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) {
-      return res.status(400).json({
-        error: "Invalid expense id",
-        code: "INVALID_ID",
-        details: { field: "id" }
+      return respondError(res, req, {
+        status: 400,
+        code: "EXPENSE_DELETE_INVALID_ID",
+        message: "Invalid expense id",
+        details: { field: "id" },
+        authenticated: true
       });
     }
 
@@ -105,13 +126,21 @@ expensesRouter.delete(
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({
-        error: "Expense not found",
-        code: "NOT_FOUND"
+      return respondError(res, req, {
+        status: 404,
+        code: "EXPENSE_DELETE_NOT_FOUND",
+        message: "Expense not found",
+        details: { id },
+        authenticated: true
       });
     }
 
-    res.json(result.rows[0]);
+    return respondSuccess(res, req, {
+      code: "EXPENSE_DELETE_SUCCESS",
+      message: "Expense deleted successfully",
+      data: { expense: result.rows[0] },
+      authenticated: true
+    });
   })
 );
 
@@ -124,10 +153,12 @@ expensesRouter.put(
   asyncHandler(async (req: Request, res: Response) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) {
-      return res.status(400).json({
-        error: "Invalid expense id",
-        code: "INVALID_ID",
-        details: { field: "id" }
+      return respondError(res, req, {
+        status: 400,
+        code: "EXPENSE_UPDATE_INVALID_ID",
+        message: "Invalid expense id",
+        details: { field: "id" },
+        authenticated: true
       });
     }
 
@@ -136,10 +167,12 @@ expensesRouter.put(
       const missingFields = [];
       if (!amount) missingFields.push("amount");
       if (!category) missingFields.push("category");
-      return res.status(400).json({
-        error: "Missing required fields",
-        code: "VALIDATION_ERROR",
-        details: { fields: missingFields }
+      return respondError(res, req, {
+        status: 400,
+        code: "EXPENSE_UPDATE_VALIDATION_FAILED",
+        message: "Missing required fields",
+        details: { fields: missingFields },
+        authenticated: true
       });
     }
 
@@ -152,12 +185,20 @@ expensesRouter.put(
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({
-        error: "Expense not found",
-        code: "NOT_FOUND"
+      return respondError(res, req, {
+        status: 404,
+        code: "EXPENSE_UPDATE_NOT_FOUND",
+        message: "Expense not found",
+        details: { id },
+        authenticated: true
       });
     }
 
-    res.json(result.rows[0]);
+    return respondSuccess(res, req, {
+      code: "EXPENSE_UPDATE_SUCCESS",
+      message: "Expense updated successfully",
+      data: { expense: result.rows[0] },
+      authenticated: true
+    });
   })
 );

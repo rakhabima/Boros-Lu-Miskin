@@ -9,6 +9,10 @@ declare global {
       name: string;
       avatar_url: string | null;
     }
+
+    interface Request {
+      requestId: string;
+    }
   }
 }
 

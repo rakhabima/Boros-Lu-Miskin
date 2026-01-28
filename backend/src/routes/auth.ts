@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { pool } from "../db.js";
 import { config } from "../config.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { respondError, respondSuccess } from "../utils/response.js";
 
 export const authRouter = Router();
 
@@ -27,7 +28,12 @@ authRouter.post("/logout", (req: Request, res: Response, next: NextFunction) => 
     if (err) return next(err);
     req.session.destroy(() => {
       res.clearCookie("connect.sid");
-      res.json({ ok: true });
+      respondSuccess(res, req, {
+        code: "AUTH_LOGOUT_SUCCESS",
+        message: "User logged out successfully",
+        data: { ok: true },
+        authenticated: false
+      });
     });
   });
 });
@@ -35,21 +41,31 @@ authRouter.post("/logout", (req: Request, res: Response, next: NextFunction) => 
 authRouter.get("/me", (req: Request, res: Response) => {
   if (!req.user) {
     console.log("[SESSION DEBUG] /auth/me unauthorized", {
+      request_id: req.requestId,
       sessionID: req.sessionID,
       session: req.session,
       user: req.user
     });
-    return res.status(401).json({
-      error: "Unauthorized",
-      code: "UNAUTHORIZED"
+    return respondError(res, req, {
+      status: 401,
+      code: "AUTH_ME_UNAUTHORIZED",
+      message: "No authenticated user found for this session",
+      details: { session_id: req.sessionID },
+      authenticated: false
     });
   }
   console.log("[SESSION DEBUG] /auth/me authorized", {
+    request_id: req.requestId,
     sessionID: req.sessionID,
     session: req.session,
     user: req.user
   });
-  res.json(req.user);
+  return respondSuccess(res, req, {
+    code: "AUTH_ME_SUCCESS",
+    message: "Authenticated user found",
+    data: { user: req.user },
+    authenticated: true
+  });
 });
 
 authRouter.post(
@@ -60,17 +76,21 @@ authRouter.post(
       (field) => !req.body?.[field]
     );
     if (missingFields.length > 0) {
-      return res.status(400).json({
-        error: "Missing required fields",
-        code: "VALIDATION_ERROR",
-        details: { fields: missingFields }
+      return respondError(res, req, {
+        status: 400,
+        code: "AUTH_SIGNUP_VALIDATION_FAILED",
+        message: "Missing required fields",
+        details: { fields: missingFields },
+        authenticated: false
       });
     }
     if (password.length < 8) {
-      return res.status(400).json({
-        error: "Password too short",
-        code: "VALIDATION_ERROR",
-        details: { field: "password", minLength: 8 }
+      return respondError(res, req, {
+        status: 400,
+        code: "AUTH_SIGNUP_PASSWORD_TOO_SHORT",
+        message: "Password too short",
+        details: { field: "password", minLength: 8 },
+        authenticated: false
       });
     }
 
@@ -83,9 +103,12 @@ authRouter.post(
 
     if (existing.rows.length > 0) {
       if (existing.rows[0].password_hash) {
-        return res.status(409).json({
-          error: "Email already registered",
-          code: "EMAIL_IN_USE"
+        return respondError(res, req, {
+          status: 409,
+          code: "AUTH_EMAIL_IN_USE",
+          message: "Email already registered",
+          details: { field: "email" },
+          authenticated: false
         });
       }
 
@@ -102,7 +125,12 @@ authRouter.post(
         if (err) return next(err);
         req.session.save((saveErr) => {
           if (saveErr) return next(saveErr);
-          res.json(updated.rows[0]);
+          respondSuccess(res, req, {
+            code: "AUTH_SIGNUP_LINKED_SUCCESS",
+            message: "Email account linked and logged in",
+            data: { user: updated.rows[0] },
+            authenticated: true
+          });
         });
       });
     }
@@ -119,7 +147,12 @@ authRouter.post(
       if (err) return next(err);
       req.session.save((saveErr) => {
         if (saveErr) return next(saveErr);
-        res.json(created.rows[0]);
+        respondSuccess(res, req, {
+          code: "AUTH_SIGNUP_SUCCESS",
+          message: "User signed up successfully",
+          data: { user: created.rows[0] },
+          authenticated: true
+        });
       });
     });
   })
@@ -129,6 +162,7 @@ authRouter.post(
   "/login",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     console.log("[SESSION DEBUG] /auth/login before", {
+      request_id: req.requestId,
       sessionID: req.sessionID,
       session: req.session
     });
@@ -137,10 +171,12 @@ authRouter.post(
       (field) => !req.body?.[field]
     );
     if (missingFields.length > 0) {
-      return res.status(400).json({
-        error: "Missing required fields",
-        code: "VALIDATION_ERROR",
-        details: { fields: missingFields }
+      return respondError(res, req, {
+        status: 400,
+        code: "AUTH_LOGIN_VALIDATION_FAILED",
+        message: "Missing required fields",
+        details: { fields: missingFields },
+        authenticated: false
       });
     }
 
@@ -152,17 +188,23 @@ authRouter.post(
     );
 
     if (result.rows.length === 0 || !result.rows[0].password_hash) {
-      return res.status(401).json({
-        error: "Invalid credentials",
-        code: "INVALID_CREDENTIALS"
+      return respondError(res, req, {
+        status: 401,
+        code: "AUTH_LOGIN_INVALID_CREDENTIALS",
+        message: "Invalid email or password",
+        details: { field: "email" },
+        authenticated: false
       });
     }
 
     const ok = await bcrypt.compare(password, result.rows[0].password_hash);
     if (!ok) {
-      return res.status(401).json({
-        error: "Invalid credentials",
-        code: "INVALID_CREDENTIALS"
+      return respondError(res, req, {
+        status: 401,
+        code: "AUTH_LOGIN_INVALID_CREDENTIALS",
+        message: "Invalid email or password",
+        details: { field: "password" },
+        authenticated: false
       });
     }
 
@@ -179,10 +221,16 @@ authRouter.post(
       req.session.save((saveErr) => {
         if (saveErr) return next(saveErr);
         console.log("[SESSION DEBUG] /auth/login after", {
+          request_id: req.requestId,
           sessionID: req.sessionID,
           session: req.session
         });
-        res.json(user);
+        respondSuccess(res, req, {
+          code: "AUTH_LOGIN_SUCCESS",
+          message: "User logged in successfully",
+          data: { user },
+          authenticated: true
+        });
       });
     });
   })
