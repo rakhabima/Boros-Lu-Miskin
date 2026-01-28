@@ -1,4 +1,5 @@
 import type { FormEvent } from "react";
+import { APP_LOGO, APP_NAME } from "../branding";
 
 type AuthCardProps = {
   authMode: "login" | "signup";
@@ -31,8 +32,11 @@ export function AuthCard({
 }: AuthCardProps) {
   return (
     <div className="rounded-xl border border-neutral-200 bg-white p-6">
-      <h1 className="text-2xl font-semibold mb-2">
-        BOROS LU MISKIN!!!
+      <h1 className="text-2xl font-semibold mb-2 flex items-center gap-2">
+        <span role="img" aria-label="Money with wings">
+          {APP_LOGO}
+        </span>
+        {APP_NAME}
       </h1>
       <p className="text-sm text-neutral-600 mb-4">
         Track your daily spending with Google or email sign-in.

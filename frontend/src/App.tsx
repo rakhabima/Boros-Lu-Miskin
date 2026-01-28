@@ -15,6 +15,7 @@ import { AuthCard } from "./components/AuthCard";
 import { CategorySelect } from "./components/CategorySelect";
 import { ExpenseTable } from "./components/ExpenseTable";
 import type { ChatMessage, Expense, User } from "./types";
+import { APP_LOGO, APP_NAME } from "./branding";
 
 const categories = ["All", "Food", "Transport", "Shopping", "Subscription", "Other"];
 const rangePresetOptions = ["Last 7 days", "Last 30 days", "Last 365 days"];
@@ -105,6 +106,10 @@ export default function App() {
     }
 
     loadUser();
+  }, []);
+
+  useEffect(() => {
+    document.title = APP_NAME;
   }, []);
 
   useEffect(() => {
@@ -452,7 +457,12 @@ export default function App() {
       <div className="max-w-5xl mx-auto px-6 py-10">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-semibold">BOROS LU MISKIN!!!</h1>
+            <h1 className="text-2xl font-semibold flex items-center gap-2">
+              <span role="img" aria-label="Money with wings">
+                {APP_LOGO}
+              </span>
+              {APP_NAME}
+            </h1>
             <p className="text-sm text-neutral-600">
               Signed in as {user.name}
             </p>
