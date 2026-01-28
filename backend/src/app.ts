@@ -65,6 +65,17 @@ app.use(
   })
 );
 
+app.use((req, res, next) => {
+  console.log("[SESSION DEBUG] request", {
+    sessionID: req.sessionID,
+    session: req.session,
+    cookieHeader: req.headers.cookie,
+    secure: req.secure,
+    forwardedProto: req.headers["x-forwarded-proto"]
+  });
+  next();
+});
+
 configurePassport();
 app.use(passport.initialize());
 app.use(passport.session());

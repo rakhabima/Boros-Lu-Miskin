@@ -34,11 +34,21 @@ authRouter.post("/logout", (req: Request, res: Response, next: NextFunction) => 
 
 authRouter.get("/me", (req: Request, res: Response) => {
   if (!req.user) {
+    console.log("[SESSION DEBUG] /auth/me unauthorized", {
+      sessionID: req.sessionID,
+      session: req.session,
+      user: req.user
+    });
     return res.status(401).json({
       error: "Unauthorized",
       code: "UNAUTHORIZED"
     });
   }
+  console.log("[SESSION DEBUG] /auth/me authorized", {
+    sessionID: req.sessionID,
+    session: req.session,
+    user: req.user
+  });
   res.json(req.user);
 });
 
@@ -118,6 +128,10 @@ authRouter.post(
 authRouter.post(
   "/login",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    console.log("[SESSION DEBUG] /auth/login before", {
+      sessionID: req.sessionID,
+      session: req.session
+    });
     const { email, password } = req.body;
     const missingFields = ["email", "password"].filter(
       (field) => !req.body?.[field]
@@ -164,6 +178,10 @@ authRouter.post(
       if (err) return next(err);
       req.session.save((saveErr) => {
         if (saveErr) return next(saveErr);
+        console.log("[SESSION DEBUG] /auth/login after", {
+          sessionID: req.sessionID,
+          session: req.session
+        });
         res.json(user);
       });
     });
