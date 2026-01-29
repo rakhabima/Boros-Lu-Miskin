@@ -35,69 +35,68 @@ const sendTelegramMessage = async (chatId: number, text: string) => {
 integrationsRouter.post(
   "/telegram/webhook",
   asyncHandler(async (req: Request, res: Response) => {
-    const secret = req.header("X-Telegram-Bot-Api-Secret-Token");
-    if (!config.telegram.webhookSecret || !config.telegram.botToken) {
-      console.error("[TELEGRAM] webhook missing env");
-      return res.sendStatus(500);
+    // Always acknowledge to Telegram; log and return 200 on any issue.
+    const ack = () => res.sendStatus(200);
+
+    try {
+      console.log("[TELEGRAM] raw update", req.body);
+
+      if (!config.telegram.webhookSecret || !config.telegram.botToken) {
+        console.error("[TELEGRAM] missing bot env");
+        return ack();
+      }
+
+      const secret = req.header("X-Telegram-Bot-Api-Secret-Token");
+      if (secret !== config.telegram.webhookSecret) {
+        console.warn("[TELEGRAM] invalid secret", { secret });
+        return ack();
+      }
+
+      const update = req.body || {};
+      const message = update.message;
+      if (!message || typeof message !== "object") {
+        return ack();
+      }
+
+      const chatId = message.chat?.id;
+      const telegramId = message.from?.id;
+      const text: string = message.text || "";
+
+      if (!chatId || !telegramId || !text) {
+        return ack();
+      }
+
+      if (text.startsWith("/start")) {
+        await sendTelegramMessage(
+          chatId,
+          "Hi! Use /link to connect this chat to your expense account."
+        );
+        return ack();
+      }
+
+      if (text.startsWith("/link")) {
+        const code = generateCode();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+        await pool.query(
+          `INSERT INTO telegram_links (telegram_id, code, confirmed, expires_at)
+           VALUES ($1, $2, FALSE, $3)
+           ON CONFLICT (telegram_id)
+           DO UPDATE SET code = EXCLUDED.code, confirmed = FALSE, expires_at = EXCLUDED.expires_at`,
+          [telegramId, code, expiresAt.toISOString()]
+        );
+        await sendTelegramMessage(
+          chatId,
+          `Link code: ${code}\nOpen the web app, go to Settings → Link Telegram, and paste this code within 10 minutes.`
+        );
+        return ack();
+      }
+
+      // Non-/link messages: ignore for now.
+      return ack();
+    } catch (err) {
+      console.error("[TELEGRAM] webhook handler error", err);
+      return ack();
     }
-    if (secret !== config.telegram.webhookSecret) {
-      console.warn("[TELEGRAM] invalid secret", { secret });
-      return res.sendStatus(401);
-    }
-
-    const message = (req.body && req.body.message) || null;
-    if (!message) return res.sendStatus(200);
-
-    const chatId = message.chat?.id;
-    const telegramId = message.from?.id;
-    const text: string = message.text || "";
-
-    if (!chatId || !telegramId) return res.sendStatus(200);
-
-    if (text.startsWith("/start")) {
-      await sendTelegramMessage(
-        chatId,
-        "Hi! Use /link to connect this chat to your expense account."
-      );
-      return res.sendStatus(200);
-    }
-
-    if (text.startsWith("/link")) {
-      const code = generateCode();
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-      await pool.query(
-        `INSERT INTO telegram_links (telegram_id, code, confirmed, expires_at)
-         VALUES ($1, $2, FALSE, $3)
-         ON CONFLICT (telegram_id)
-         DO UPDATE SET code = EXCLUDED.code, confirmed = FALSE, expires_at = EXCLUDED.expires_at`,
-        [telegramId, code, expiresAt.toISOString()]
-      );
-      await sendTelegramMessage(
-        chatId,
-        `Link code: ${code}\nOpen the web app, go to Settings → Link Telegram, and paste this code within 10 minutes.`
-      );
-      return res.sendStatus(200);
-    }
-
-    // Default: if not linked, prompt; otherwise stub (full OCR/expense flow to be added later)
-    const link = await pool.query(
-      `SELECT confirmed, app_user_id FROM telegram_links WHERE telegram_id = $1 AND expires_at > NOW()`,
-      [telegramId]
-    );
-
-    if (link.rows.length === 0 || !link.rows[0].confirmed) {
-      await sendTelegramMessage(
-        chatId,
-        "This chat is not linked yet. Send /link to get a code, then paste it in the web app."
-      );
-      return res.sendStatus(200);
-    }
-
-    await sendTelegramMessage(
-      chatId,
-      "Linked chat received your message. Receipt parsing is not enabled yet in this stub."
-    );
-    return res.sendStatus(200);
   })
 );
 
