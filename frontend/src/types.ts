@@ -23,7 +23,7 @@ export type InsightResponse = {
   text: string;
   total: number;
   categories: Array<{ category: string; total: number }>;
-  remaining: number;
+  remaining: number | null;
 };
 
 export type ChatMessage = {

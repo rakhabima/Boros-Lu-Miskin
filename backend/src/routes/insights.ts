@@ -13,8 +13,6 @@ const getMonthRange = (year: number, month: number) => {
   return { start, end };
 };
 
-const DAILY_LIMIT = 10;
-
 const defaultPrompt = "give me insights about my expenses";
 
 const fetchSummary = async (
@@ -71,7 +69,7 @@ insightsRouter.post(
   "/",
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
-    const { prompt, isDefault } = req.body;
+    const { prompt } = req.body;
     if (!config.ai.apiKey) {
       return respondError(res, req, {
         status: 500,
@@ -82,27 +80,7 @@ insightsRouter.post(
       });
     }
 
-    const today = new Date().toISOString().slice(0, 10);
-    const usageResult = await pool.query(
-      `SELECT count FROM ai_usage WHERE user_id = $1 AND usage_date = $2`,
-      [req.user!.id, today]
-    );
-    const currentCount = usageResult.rows[0]?.count || 0;
-    if (!isDefault && currentCount >= DAILY_LIMIT) {
-      return respondError(res, req, {
-        status: 429,
-        code: "AI_RATE_LIMITED",
-        message: "Daily AI limit reached",
-        details: { limit: DAILY_LIMIT },
-        authenticated: true
-      });
-    }
-
     const userPrompt = prompt?.trim() || "Give me insights and tips.";
-    const defaultMode =
-      isDefault ||
-      (userPrompt.toLowerCase() === defaultPrompt &&
-        (!req.body.messages || req.body.messages.length === 0));
 
     let total = 0;
     let categories: Array<{ category: string; total: number }> = [];
@@ -203,24 +181,7 @@ insightsRouter.post(
     }
 
     const text = completion.choices?.[0]?.message?.content || "";
-    const nextCount = currentCount + (defaultMode ? 0 : 1);
-    const remaining = Math.max(0, DAILY_LIMIT - nextCount);
-
-    if (!defaultMode) {
-      if (currentCount === 0) {
-        await pool.query(
-          `INSERT INTO ai_usage (user_id, usage_date, count)
-           VALUES ($1, $2, 1)`,
-          [req.user!.id, today]
-        );
-      } else {
-        await pool.query(
-          `UPDATE ai_usage SET count = count + 1
-           WHERE user_id = $1 AND usage_date = $2`,
-          [req.user!.id, today]
-        );
-      }
-    }
+    const remaining = null;
     return respondSuccess(res, req, {
       code: "AI_INSIGHTS_SUCCESS",
       message: "AI insights generated successfully",
