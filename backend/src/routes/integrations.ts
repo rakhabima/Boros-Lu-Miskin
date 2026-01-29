@@ -5,6 +5,7 @@ import { config } from "../config.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { respondError, respondSuccess } from "../utils/response.js";
+import { signLinkToken, verifyLinkToken } from "../utils/linkToken.js";
 
 export const integrationsRouter = Router();
 
@@ -26,6 +27,31 @@ const sendTelegramMessage = async (chatId: number, text: string) => {
     console.error("[TELEGRAM] sendMessage failed", { err });
   }
 };
+
+/**
+ * Start link flow: generates deep link token for Telegram /start
+ */
+integrationsRouter.post(
+  "/telegram/start-link",
+  requireAuth,
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!config.telegram.botUsername) {
+      return respondError(res, req, {
+        status: 500,
+        code: "TELEGRAM_BOT_USERNAME_MISSING",
+        message: "Bot username is not configured"
+      });
+    }
+    const token = signLinkToken(req.user!.id, 5);
+    const url = `https://t.me/${config.telegram.botUsername}?start=link_${token}`;
+    return respondSuccess(res, req, {
+      code: "TELEGRAM_START_LINK_SUCCESS",
+      message: "Generated Telegram link URL",
+      data: { url },
+      authenticated: true
+    });
+  })
+);
 
 /**
  * Telegram webhook receiver
@@ -67,6 +93,27 @@ integrationsRouter.post(
       }
 
       if (text.startsWith("/start")) {
+        // Expecting /start link_<token>
+        const parts = text.split(" ").concat(text.split("\n"));
+        const tokenPart = parts.find((p) => p.startsWith("/start link_") || p.startsWith("link_"));
+        if (tokenPart && tokenPart.includes("link_")) {
+          const token = tokenPart.split("link_")[1];
+          const payload = verifyLinkToken(token);
+          if (!payload) {
+            await sendTelegramMessage(chatId, "⚠️ Link tidak valid atau sudah kedaluwarsa.");
+            return ack();
+          }
+          await pool.query(
+            `INSERT INTO telegram_links (telegram_id, app_user_id, confirmed, expires_at)
+             VALUES ($1, $2, TRUE, NOW())
+             ON CONFLICT (telegram_id)
+             DO UPDATE SET app_user_id = EXCLUDED.app_user_id, confirmed = TRUE, expires_at = EXCLUDED.expires_at`,
+            [telegramId, payload.uid]
+          );
+          await sendTelegramMessage(chatId, "✅ Telegram account successfully connected.");
+          return ack();
+        }
+
         await sendTelegramMessage(
           chatId,
           "Hi! Use /link to connect this chat to your expense account."
