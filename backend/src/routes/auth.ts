@@ -10,11 +10,30 @@ export const authRouter = Router();
 
 authRouter.get(
   "/google",
+  (req: Request, res: Response, next: NextFunction) => {
+    console.log("[OAUTH DEBUG] /auth/google start", {
+      request_id: req.requestId,
+      origin: req.headers.origin,
+      host: req.headers.host,
+      userAgent: req.headers["user-agent"]
+    });
+    next();
+  },
   passport.authenticate("google", { scope: ["profile", "email"] })
 );
 
 authRouter.get(
   "/google/callback",
+  (req: Request, res: Response, next: NextFunction) => {
+    console.log("[OAUTH DEBUG] /auth/google/callback start", {
+      request_id: req.requestId,
+      origin: req.headers.origin,
+      host: req.headers.host,
+      queryKeys: Object.keys(req.query || {}),
+      hasCode: typeof req.query?.code === "string"
+    });
+    next();
+  },
   passport.authenticate("google", {
     failureRedirect: `${config.origins.frontend}/login?error=oauth`
   }),

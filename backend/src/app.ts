@@ -27,6 +27,12 @@ const allowedOrigins = new Set<string>([
   ...rawAllowedOrigins
 ]);
 
+console.log("[CONFIG] origins", {
+  frontend: config.origins.frontend,
+  backend: config.origins.backend,
+  cors_allowlist: Array.from(allowedOrigins)
+});
+
 app.use(
   cors({
     origin: (origin, callback) => {

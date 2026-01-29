@@ -13,6 +13,11 @@ export const configurePassport = () => {
       },
       async (accessToken, refreshToken, profile, done) => {
         try {
+          console.log("[OAUTH DEBUG] Google profile received", {
+            id: profile.id,
+            email: profile.emails?.[0]?.value || null,
+            displayName: profile.displayName || null
+          });
           const googleId = profile.id;
           const email = profile.emails?.[0]?.value || null;
           const name = profile.displayName || "Unknown";
