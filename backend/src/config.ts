@@ -32,7 +32,8 @@ export const config = {
   },
   session: {
     secret: process.env.SESSION_SECRET as string,
-    isProd: process.env.NODE_ENV === "production"
+    isProd: process.env.NODE_ENV === "production",
+    ttlSeconds: Number(process.env.SESSION_TTL_SECONDS || 60 * 60 * 24 * 14) // 14 days
   },
   origins: {
     frontend: process.env.FRONTEND_ORIGIN || "",
@@ -43,5 +44,8 @@ export const config = {
     webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || "",
     botUsername: process.env.TELEGRAM_BOT_USERNAME || "",
     linkSecret: process.env.TELEGRAM_LINK_SECRET || process.env.SESSION_SECRET || ""
+  },
+  redis: {
+    url: process.env.REDIS_URL || "redis://localhost:6379"
   }
 };

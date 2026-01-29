@@ -64,6 +64,14 @@ authRouter.post("/logout", (req: Request, res: Response, next: NextFunction) => 
   });
 });
 
+// CSRF token fetcher for frontend
+authRouter.get("/csrf", (req: Request, res: Response) => {
+  if (!req.csrfToken) {
+    return res.status(500).json({ success: false, message: "CSRF not configured" });
+  }
+  return res.json({ success: true, token: req.csrfToken() });
+});
+
 authRouter.get("/me", async (req: Request, res: Response, next: NextFunction) => {
   if (!req.user && req.session?.userId) {
     try {
@@ -184,6 +192,8 @@ authRouter.post(
       [email, name, hash]
     );
 
+  return req.session.regenerate((regenErr) => {
+    if (regenErr) return next(regenErr);
     return req.login(created.rows[0], (err) => {
       if (err) return next(err);
       req.session.userId = created.rows[0].id;
@@ -197,6 +207,7 @@ authRouter.post(
         });
       });
     });
+  });
   })
 );
 
@@ -258,21 +269,24 @@ authRouter.post(
       avatar_url: result.rows[0].avatar_url
     };
 
-    return req.login(user, (err) => {
-      if (err) return next(err);
-      req.session.userId = user.id;
-      req.session.save((saveErr) => {
-        if (saveErr) return next(saveErr);
-        console.log("[SESSION DEBUG] /auth/login after", {
-          request_id: req.requestId,
-          sessionID: req.sessionID,
-          session: req.session
-        });
-        respondSuccess(res, req, {
-          code: "AUTH_LOGIN_SUCCESS",
-          message: "User logged in successfully",
-          data: { user },
-          authenticated: true
+    return req.session.regenerate((regenErr) => {
+      if (regenErr) return next(regenErr);
+      return req.login(user, (err) => {
+        if (err) return next(err);
+        req.session.userId = user.id;
+        req.session.save((saveErr) => {
+          if (saveErr) return next(saveErr);
+          console.log("[SESSION DEBUG] /auth/login after", {
+            request_id: req.requestId,
+            sessionID: req.sessionID,
+            session: req.session
+          });
+          respondSuccess(res, req, {
+            code: "AUTH_LOGIN_SUCCESS",
+            message: "User logged in successfully",
+            data: { user },
+            authenticated: true
+          });
         });
       });
     });

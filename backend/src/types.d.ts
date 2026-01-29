@@ -12,6 +12,7 @@ declare global {
 
     interface Request {
       requestId: string;
+      csrfToken?: () => string;
     }
   }
 }

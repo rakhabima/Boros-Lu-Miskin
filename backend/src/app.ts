@@ -3,6 +3,9 @@ import { randomUUID } from "crypto";
 import cors from "cors";
 import session from "express-session";
 import passport from "passport";
+import csrf from "csurf";
+import RedisStoreFactory from "connect-redis";
+import { createClient as createRedisClient } from "redis";
 import { config } from "./config.js";
 import { configurePassport } from "./auth/passport.js";
 import { authRouter } from "./routes/auth.js";
@@ -27,6 +30,13 @@ const allowedOrigins = new Set<string>([
   ...explicitAllowedOrigins.map(normalizeOrigin),
   ...rawAllowedOrigins
 ]);
+
+// Redis session store
+const RedisStore = RedisStoreFactory(session);
+const redisClient = createRedisClient({ url: config.redis.url });
+redisClient.connect().catch((err) => {
+  console.error("[REDIS] connection error", err);
+});
 
 console.log("[CONFIG] origins", {
   frontend: config.origins.frontend,
@@ -74,6 +84,10 @@ app.use(
     proxy: true,
     resave: false,
     saveUninitialized: false,
+    store: new RedisStore({
+      client: redisClient,
+      ttl: config.session.ttlSeconds
+    }),
     cookie: {
       httpOnly: true,
       sameSite: "lax",
@@ -96,6 +110,23 @@ app.use((req, res, next) => {
 configurePassport();
 app.use(passport.initialize());
 app.use(passport.session());
+
+// CSRF protection for browser routes (exclude Telegram webhooks and public auth)
+const csrfProtection = csrf();
+const csrfExemptPaths = [
+  /^\/integrations\/telegram\/?/,
+  /^\/auth\/google/,
+  /^\/auth\/google\/callback/,
+  /^\/auth\/login/,
+  /^\/auth\/signup/
+];
+
+app.use((req, res, next) => {
+  if (csrfExemptPaths.some((rx) => rx.test(req.path))) return next();
+  // Allow safe methods without token
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return csrfProtection(req, res, next);
+  return csrfProtection(req, res, next);
+});
 
 app.use("/auth", authRouter);
 app.use("/expenses", expensesRouter);
