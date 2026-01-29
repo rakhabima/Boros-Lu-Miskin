@@ -74,24 +74,13 @@ integrationsRouter.post(
         return ack();
       }
 
-      if (text.startsWith("/link")) {
-        const code = generateCode();
-        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-        await pool.query(
-          `INSERT INTO telegram_links (telegram_id, code, confirmed, expires_at)
-           VALUES ($1, $2, FALSE, $3)
-           ON CONFLICT (telegram_id)
-           DO UPDATE SET code = EXCLUDED.code, confirmed = FALSE, expires_at = EXCLUDED.expires_at`,
-          [telegramId, code, expiresAt.toISOString()]
-        );
-        await sendTelegramMessage(
-          chatId,
-          `Link code: ${code}\nOpen the web app, go to Settings → Link Telegram, and paste this code within 10 minutes.`
-        );
+      if (text === "/link") {
+        const code = generateCode().slice(0, 8); // 6-8 chars, uppercase hex
+        await sendTelegramMessage(chatId, `🔗 Kode linking kamu: ${code}`);
         return ack();
       }
 
-      // Non-/link messages: ignore for now.
+      // Non-/link messages: ignore for now (future OCR/logic).
       return ack();
     } catch (err) {
       console.error("[TELEGRAM] webhook handler error", err);
