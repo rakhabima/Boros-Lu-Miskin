@@ -39,7 +39,7 @@ export function AuthCard({
         {APP_NAME}
       </h1>
       <p className="text-sm text-neutral-600 mb-4">
-        Track your daily spending with Google or email sign-in.
+        Masih boros in this economy?!?!?!?
       </p>
       <div className="flex flex-col gap-4">
         <div className="flex gap-2 text-sm">

@@ -35,7 +35,7 @@ export const config = {
     isProd: process.env.NODE_ENV === "production"
   },
   origins: {
-    frontend: process.env.FRONTEND_ORIGIN || "http://localhost:5173",
-    backend: process.env.BACKEND_ORIGIN || "http://localhost:4000"
+    frontend: process.env.FRONTEND_ORIGIN || "",
+    backend: process.env.BACKEND_ORIGIN || ""
   }
 };
