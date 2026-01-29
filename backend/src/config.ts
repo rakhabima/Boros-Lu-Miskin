@@ -37,5 +37,9 @@ export const config = {
   origins: {
     frontend: process.env.FRONTEND_ORIGIN || "",
     backend: process.env.BACKEND_ORIGIN || ""
+  },
+  telegram: {
+    botToken: process.env.TELEGRAM_BOT_TOKEN || "",
+    webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || ""
   }
 };

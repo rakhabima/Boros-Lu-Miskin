@@ -39,3 +39,18 @@ CREATE TABLE IF NOT EXISTS ai_usage (
   count INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, usage_date)
 );
+
+-- Telegram link codes for chat-to-account mapping
+CREATE TABLE IF NOT EXISTS telegram_links (
+  telegram_id BIGINT PRIMARY KEY,
+  app_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  code VARCHAR(12) NOT NULL,
+  confirmed BOOLEAN DEFAULT FALSE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Ensure existing column allows null before confirmation
+ALTER TABLE telegram_links ALTER COLUMN app_user_id DROP NOT NULL;
+
+CREATE INDEX IF NOT EXISTS telegram_links_code_idx ON telegram_links (code);

@@ -8,6 +8,7 @@ import { configurePassport } from "./auth/passport.js";
 import { authRouter } from "./routes/auth.js";
 import { expensesRouter } from "./routes/expenses.js";
 import { insightsRouter } from "./routes/insights.js";
+import { integrationsRouter } from "./routes/integrations.js";
 import { errorHandler } from "./middleware/error.js";
 
 const app = express();
@@ -99,6 +100,7 @@ app.use(passport.session());
 app.use("/auth", authRouter);
 app.use("/expenses", expensesRouter);
 app.use("/insights", insightsRouter);
+app.use("/integrations", integrationsRouter);
 
 app.use(errorHandler);
 
