@@ -186,6 +186,9 @@ async function ensureCsrfToken(): Promise<string> {
 
 export async function getTelegramStatus(): Promise<{ connected: boolean }> {
   const res = await fetch(`${API_URL}/integrations/telegram/status`, withAuth);
+  if (res.status === 401) {
+    return { connected: false };
+  }
   return parseResponse<{ connected: boolean }>(res);
 }
 
