@@ -45,12 +45,13 @@ export function TelegramConnect() {
       if (!res.ok) {
         throw new Error("Failed to start Telegram linking");
       }
-      const data = await res.json();
-      console.log("Telegram start-link response:", data);
-      if (!data?.url) {
+      const payload = await res.json();
+      console.log("Telegram start-link payload:", payload);
+      const telegramUrl = payload?.data?.url;
+      if (!telegramUrl) {
         throw new Error("Telegram link URL missing from response");
       }
-      window.open(data.url, "_blank");
+      window.open(telegramUrl, "_blank");
     } catch (err) {
       setError("Could not start Telegram linking. Please try again.");
     } finally {
