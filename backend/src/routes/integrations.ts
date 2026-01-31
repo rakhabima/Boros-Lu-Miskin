@@ -177,6 +177,31 @@ integrationsRouter.post(
 );
 
 /**
+ * Telegram link status for the logged-in user
+ */
+integrationsRouter.get(
+  "/telegram/status",
+  requireAuth,
+  asyncHandler(async (req: Request, res: Response) => {
+    const result = await pool.query(
+      `SELECT telegram_id
+       FROM telegram_links
+       WHERE app_user_id = $1 AND confirmed = TRUE
+       LIMIT 1`,
+      [req.user!.id]
+    );
+
+    const connected = result.rows.length > 0;
+    return respondSuccess(res, req, {
+      code: "TELEGRAM_STATUS_SUCCESS",
+      message: "Telegram status retrieved",
+      data: { connected },
+      authenticated: true
+    });
+  })
+);
+
+/**
  * Helper route to register the webhook with Telegram (protect in production)
  */
 integrationsRouter.post(
