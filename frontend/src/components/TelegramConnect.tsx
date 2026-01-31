@@ -35,8 +35,22 @@ export function TelegramConnect() {
     setConnecting(true);
     try {
       const csrf = await fetchCsrfToken();
-      const { url } = await startTelegramLink(csrf);
-      window.open(url, "_blank", "noopener,noreferrer");
+      const res = await fetch("/integrations/telegram/start-link", {
+        method: "POST",
+        headers: {
+          "X-CSRF-Token": csrf
+        },
+        credentials: "include"
+      });
+      if (!res.ok) {
+        throw new Error("Failed to start Telegram linking");
+      }
+      const data = await res.json();
+      console.log("Telegram start-link response:", data);
+      if (!data?.url) {
+        throw new Error("Telegram link URL missing from response");
+      }
+      window.open(data.url, "_blank");
     } catch (err) {
       setError("Could not start Telegram linking. Please try again.");
     } finally {
@@ -49,16 +63,25 @@ export function TelegramConnect() {
   }
 
   if (status === "connected") {
-    return <div>✅ Telegram Connected</div>;
+    return (
+      <div className="inline-flex items-center gap-2 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700 border border-green-200">
+        <span>✅</span>
+        <span>Telegram Connected</span>
+      </div>
+    );
   }
 
   return (
-    <div>
-      <button onClick={handleConnect} disabled={connecting}>
+    <div className="inline-flex flex-col gap-2">
+      <button
+        onClick={handleConnect}
+        disabled={connecting}
+        className="inline-flex items-center justify-center rounded-md bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-4 py-2 text-sm font-medium transition-colors"
+      >
         {connecting ? "Connecting…" : "Connect Telegram"}
       </button>
       {error && (
-        <div style={{ color: "red", marginTop: "0.5rem" }}>{error}</div>
+        <div className="text-sm text-red-600">{error}</div>
       )}
     </div>
   );
