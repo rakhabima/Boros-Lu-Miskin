@@ -1,5 +1,4 @@
 import { Router, type Request, type Response } from "express";
-import { randomBytes } from "crypto";
 import { pool } from "../db.js";
 import { config } from "../config.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -12,8 +11,6 @@ export const integrationsRouter = Router();
 const TELEGRAM_API = config.telegram.botToken
   ? `https://api.telegram.org/bot${config.telegram.botToken}`
   : null;
-
-const generateCode = () => randomBytes(4).toString("hex").toUpperCase();
 
 const sendTelegramMessage = async (chatId: number, text: string) => {
   if (!TELEGRAM_API) return;
@@ -42,7 +39,16 @@ integrationsRouter.post(
         message: "Bot username is not configured"
       });
     }
-    const token = signLinkToken(req.user!.id, 5);
+    const ttlMinutes = 5;
+    const token = signLinkToken(req.user!.id, ttlMinutes);
+    const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
+    // one row per user; reset any pending/unconfirmed rows
+    await pool.query(`DELETE FROM telegram_links WHERE app_user_id = $1`, [req.user!.id]);
+    await pool.query(
+      `INSERT INTO telegram_links (telegram_id, app_user_id, code, confirmed, expires_at, created_at)
+       VALUES (NULL, $1, $2, FALSE, $3, NOW())`,
+      [req.user!.id, token, expiresAt.toISOString()]
+    );
     const url = `https://t.me/${config.telegram.botUsername}?start=link_${token}`;
     return respondSuccess(res, req, {
       code: "TELEGRAM_START_LINK_SUCCESS",
@@ -103,29 +109,48 @@ integrationsRouter.post(
             await sendTelegramMessage(chatId, "⚠️ Link tidak valid atau sudah kedaluwarsa.");
             return ack();
           }
-          // ensure single mapping per user; replace old chat if re-linking
-          await pool.query(`DELETE FROM telegram_links WHERE app_user_id = $1`, [payload.uid]);
-          await pool.query(
-            `INSERT INTO telegram_links (telegram_id, app_user_id, confirmed, expires_at)
-             VALUES ($1, $2, TRUE, NOW())
-             ON CONFLICT (telegram_id)
-             DO UPDATE SET app_user_id = EXCLUDED.app_user_id, confirmed = TRUE, expires_at = EXCLUDED.expires_at`,
-            [telegramId, payload.uid]
+          // confirm only existing pending link rows
+          const pending = await pool.query(
+            `SELECT app_user_id, confirmed, expires_at
+             FROM telegram_links
+             WHERE code = $1 AND app_user_id = $2`,
+            [token, payload.uid]
           );
-          await sendTelegramMessage(chatId, "✅ Telegram account successfully connected.");
+
+          if (
+            pending.rows.length === 0 ||
+            pending.rows[0].confirmed ||
+            (pending.rows[0].expires_at && new Date(pending.rows[0].expires_at) < new Date())
+          ) {
+            await sendTelegramMessage(chatId, "⚠️ Link tidak valid atau sudah kedaluwarsa.");
+            return ack();
+          }
+
+          await pool.query(
+            `UPDATE telegram_links
+             SET telegram_id = $1, confirmed = TRUE, expires_at = NULL
+             WHERE code = $2 AND app_user_id = $3`,
+            [telegramId, token, payload.uid]
+          );
+
+          await sendTelegramMessage(
+            chatId,
+            "✅ Telegram account successfully connected.\nYou can now send receipt photos to record expenses."
+          );
           return ack();
         }
 
-        await sendTelegramMessage(
-          chatId,
-          "Hi! Use /link to connect this chat to your expense account."
-        );
+        await sendTelegramMessage(chatId, "❌ Telegram is not connected.\nPlease connect your account from the web app.");
         return ack();
       }
 
-      if (text === "/link") {
-        const code = generateCode().slice(0, 8); // 6-8 chars, uppercase hex
-        await sendTelegramMessage(chatId, `🔗 Kode linking kamu: ${code}`);
+      // For any other message, ensure chat is linked
+      const linked = await pool.query(
+        `SELECT app_user_id FROM telegram_links WHERE telegram_id = $1 AND confirmed = TRUE LIMIT 1`,
+        [telegramId]
+      );
+      if (linked.rows.length === 0) {
+        await sendTelegramMessage(chatId, "❌ Telegram is not connected.\nPlease connect your account from the web app.");
         return ack();
       }
 
@@ -145,34 +170,10 @@ integrationsRouter.post(
   "/telegram/confirm",
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
-    const { code } = req.body || {};
-    if (!code || typeof code !== "string") {
-      return respondError(res, req, {
-        status: 400,
-        code: "TELEGRAM_CONFIRM_INVALID_CODE",
-        message: "Code is required"
-      });
-    }
-
-    const result = await pool.query(
-      `UPDATE telegram_links
-       SET app_user_id = $1, confirmed = TRUE
-       WHERE code = $2 AND expires_at > NOW()
-       RETURNING telegram_id`,
-      [req.user!.id, code]
-    );
-
-    if (result.rows.length === 0) {
-      return respondError(res, req, {
-        status: 404,
-        code: "TELEGRAM_CONFIRM_NOT_FOUND",
-        message: "Code not found or expired"
-      });
-    }
-
-    return respondSuccess(res, req, {
-      code: "TELEGRAM_CONFIRM_SUCCESS",
-      message: "Telegram chat linked successfully",
+    return respondError(res, req, {
+      status: 410,
+      code: "TELEGRAM_CONFIRM_DEPRECATED",
+      message: "Code-based linking is no longer supported. Use the Connect Telegram button in the web app.",
       authenticated: true
     });
   })
