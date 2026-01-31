@@ -4,7 +4,7 @@ import cors from "cors";
 import session from "express-session";
 import passport from "passport";
 import csrf from "csurf";
-import RedisStore from "connect-redis";
+import RedisStore = require("connect-redis");
 import { createClient } from "redis";
 import { config } from "./config.js";
 import { configurePassport } from "./auth/passport.js";
