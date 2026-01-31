@@ -78,7 +78,8 @@ integrationsRouter.post(
     const ack = () => res.sendStatus(200);
 
     try {
-      console.log("[TELEGRAM] raw update", req.body);
+      const update = req.body || {};
+      console.log("[TG RAW UPDATE]", JSON.stringify(update, null, 2));
 
       if (!config.telegram.webhookSecret || !config.telegram.botToken) {
         console.error("[TELEGRAM] missing bot env");
@@ -91,8 +92,18 @@ integrationsRouter.post(
         return ack();
       }
 
-      const update = req.body || {};
       const message = update.message;
+      console.log("[TG MESSAGE TEXT]", message?.text);
+      console.log("[TG CHAT ID]", message?.chat?.id);
+      console.log("[TG FROM ID]", message?.from?.id);
+
+      if (message?.text === "/start") {
+        console.warn("[TG START WITHOUT TOKEN]");
+      }
+      if (message?.text?.startsWith("/start link_")) {
+        console.info("[TG START WITH TOKEN]");
+      }
+
       if (!message || typeof message !== "object") {
         return ack();
       }
