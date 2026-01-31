@@ -220,3 +220,33 @@ export async function getInsights(payload: {
   }
   return envelope.data;
 }
+
+// --- Telegram linking helpers ---
+
+export async function fetchCsrfToken(): Promise<string> {
+  const res = await fetch(`${API_URL}/auth/csrf`, withAuth);
+  const data = await parseResponse<{ success: boolean; token: string }>(res);
+  if (!data.token) {
+    throw new Error("CSRF token missing");
+  }
+  return data.token;
+}
+
+export async function getTelegramStatus(): Promise<{ connected: boolean }> {
+  const res = await fetch(`${API_URL}/integrations/telegram/status`, withAuth);
+  return parseResponse<{ connected: boolean }>(res);
+}
+
+export async function startTelegramLink(
+  csrfToken: string
+): Promise<{ url: string }> {
+  const res = await fetch(`${API_URL}/integrations/telegram/start-link`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRF-Token": csrfToken
+    },
+    ...withAuth
+  });
+  return parseResponse<{ url: string }>(res);
+}
