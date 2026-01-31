@@ -8,6 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -37,7 +38,7 @@ services:
       TELEGRAM_LINK_SECRET: ${TELEGRAM_LINK_SECRET}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN}
       BACKEND_ORIGIN: ${BACKEND_ORIGIN}
-      REDIS_URL: ${REDIS_URL}
+      REDIS_URL: redis://redis:6379
     depends_on:
       - db
 
@@ -53,3 +54,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
