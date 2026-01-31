@@ -103,6 +103,8 @@ integrationsRouter.post(
             await sendTelegramMessage(chatId, "⚠️ Link tidak valid atau sudah kedaluwarsa.");
             return ack();
           }
+          // ensure single mapping per user; replace old chat if re-linking
+          await pool.query(`DELETE FROM telegram_links WHERE app_user_id = $1`, [payload.uid]);
           await pool.query(
             `INSERT INTO telegram_links (telegram_id, app_user_id, confirmed, expires_at)
              VALUES ($1, $2, TRUE, NOW())
