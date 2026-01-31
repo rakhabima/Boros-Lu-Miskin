@@ -4,7 +4,7 @@ import cors from "cors";
 import session from "express-session";
 import passport from "passport";
 import csrf from "csurf";
-import RedisStore from "connect-redis";
+import connectRedis from "connect-redis";
 import { createClient } from "redis";
 import { config } from "./config.js";
 import { configurePassport } from "./auth/passport.js";
@@ -36,7 +36,8 @@ const redisClient = createClient({ url: config.redis.url });
 redisClient.connect().catch((err) => {
   console.error("[REDIS] connection error", err);
 });
-const redisStore = new (RedisStore(session))({
+const RedisStore = connectRedis(session);
+const redisStore = new RedisStore({
   client: redisClient,
   ttl: config.session.ttlSeconds,
   prefix: "sess:"
