@@ -44,13 +44,14 @@ CREATE TABLE IF NOT EXISTS ai_usage (
 CREATE TABLE IF NOT EXISTS telegram_links (
   telegram_id BIGINT PRIMARY KEY,
   app_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  code TEXT NOT NULL
+  code TEXT NOT NULL,
   confirmed BOOLEAN DEFAULT FALSE,
-  expires_at TIMESTAMPTZ NOT NULL,
+  expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Ensure existing column allows null before confirmation
 ALTER TABLE telegram_links ALTER COLUMN app_user_id DROP NOT NULL;
+ALTER TABLE telegram_links ALTER COLUMN expires_at DROP NOT NULL;
 
 CREATE INDEX IF NOT EXISTS telegram_links_code_idx ON telegram_links (code);

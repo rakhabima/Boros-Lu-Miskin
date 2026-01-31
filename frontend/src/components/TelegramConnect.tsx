@@ -48,9 +48,15 @@ export function TelegramConnect() {
       const payload = await res.json();
       console.log("Telegram start-link payload:", payload);
       const telegramUrl = payload?.data?.url;
-      if (!telegramUrl) {
-        throw new Error("Telegram link URL missing from response");
+      if (
+        !telegramUrl ||
+        typeof telegramUrl !== "string" ||
+        !telegramUrl.includes("t.me/") ||
+        !telegramUrl.includes("?start=link_")
+      ) {
+        throw new Error("Telegram link URL missing or invalid in response");
       }
+      console.log("Telegram connect URL:", telegramUrl);
       window.open(telegramUrl, "_blank");
     } catch (err) {
       setError("Could not start Telegram linking. Please try again.");

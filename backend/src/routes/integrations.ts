@@ -49,7 +49,14 @@ integrationsRouter.post(
        VALUES (NULL, $1, $2, FALSE, $3, NOW())`,
       [req.user!.id, token, expiresAt.toISOString()]
     );
-    const url = `https://t.me/${config.telegram.botUsername}?start=link_${token}`;
+    const uniqueSuffix = Date.now();
+    const url = `https://t.me/${config.telegram.botUsername}?start=link_${token}__${uniqueSuffix}`;
+    console.log("[TELEGRAM] start-link created", {
+      user_id: req.user!.id,
+      token,
+      expires_at: expiresAt.toISOString(),
+      url
+    });
     return respondSuccess(res, req, {
       code: "TELEGRAM_START_LINK_SUCCESS",
       message: "Generated Telegram link URL",
@@ -100,13 +107,15 @@ integrationsRouter.post(
 
       if (text.startsWith("/start")) {
         // Expecting /start link_<token>
-        const parts = text.split(" ").concat(text.split("\n"));
-        const tokenPart = parts.find((p) => p.startsWith("/start link_") || p.startsWith("link_"));
+        const parts = text.split(/\s+/);
+        const tokenPart = parts.find((p) => p.includes("link_"));
         if (tokenPart && tokenPart.includes("link_")) {
-          const token = tokenPart.split("link_")[1];
+          const raw = tokenPart.split("link_")[1];
+          const [token] = raw.split("__"); // strip suffix
           const payload = verifyLinkToken(token);
           if (!payload) {
             await sendTelegramMessage(chatId, "⚠️ Link tidak valid atau sudah kedaluwarsa.");
+            console.warn("[TELEGRAM] invalid token", { chatId, telegramId, raw });
             return ack();
           }
           // confirm only existing pending link rows
@@ -123,6 +132,13 @@ integrationsRouter.post(
             (pending.rows[0].expires_at && new Date(pending.rows[0].expires_at) < new Date())
           ) {
             await sendTelegramMessage(chatId, "⚠️ Link tidak valid atau sudah kedaluwarsa.");
+            console.warn("[TELEGRAM] pending not found/expired", {
+              chatId,
+              telegramId,
+              token,
+              expires_at: pending.rows[0]?.expires_at,
+              confirmed: pending.rows[0]?.confirmed
+            });
             return ack();
           }
 
@@ -137,9 +153,11 @@ integrationsRouter.post(
             chatId,
             "✅ Telegram account successfully connected.\nYou can now send receipt photos to record expenses."
           );
+          console.log("[TELEGRAM] link confirmed", { chatId, telegramId, user_id: payload.uid });
           return ack();
         }
 
+        console.warn("[TELEGRAM] /start without link token", { chatId, telegramId, text });
         await sendTelegramMessage(chatId, "❌ Telegram is not connected.\nPlease connect your account from the web app.");
         return ack();
       }
