@@ -36,7 +36,7 @@ const redisClient = createClient({ url: config.redis.url });
 redisClient.connect().catch((err) => {
   console.error("[REDIS] connection error", err);
 });
-const RedisStore = connectRedis(session);
+const RedisStore = (connectRedis as unknown as (sess: typeof session) => any)(session);
 const redisStore = new RedisStore({
   client: redisClient,
   ttl: config.session.ttlSeconds,
