@@ -112,10 +112,11 @@ configurePassport();
 app.use(passport.initialize());
 app.use(passport.session());
 
-// CSRF protection for browser routes (exclude Telegram webhooks and public auth)
+// CSRF protection for browser routes (exclude Telegram webhook and public auth)
 const csrfProtection = csrf();
 const csrfExemptPaths = [
-  /^\/integrations\/telegram\/?/,
+  /^\/integrations\/telegram\/webhook/,
+  /^\/integrations\/telegram\/set-webhook/,
   /^\/auth\/google/,
   /^\/auth\/google\/callback/,
   /^\/auth\/login/,

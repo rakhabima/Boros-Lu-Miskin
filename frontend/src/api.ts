@@ -126,70 +126,11 @@ export async function getCurrentUser(): Promise<User | null> {
   return envelope.data?.user ?? null;
 }
 
-export async function logout(): Promise<{ ok: boolean }> {
-  const res = await fetch(`${API_URL}/auth/logout`, {
-    method: "POST",
-    ...withAuth
-  });
-  const envelope = await parseEnvelope<{ ok: boolean }>(res);
-  if (!envelope.data) {
-    throw new Error("Missing logout response data");
-  }
-  return envelope.data;
-}
-
-export async function addExpense(data: {
-    amount: number;
-    category: string;
-    notes: string;
-}): Promise<Expense> {
-  const res = await fetch(`${API_URL}/expenses`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-    ...withAuth
-  });
-  const envelope = await parseEnvelope<{ expense: Expense }>(res);
-  if (!envelope.data?.expense) {
-    throw new Error("Missing expense in create response");
-  }
-  return envelope.data.expense;
-}
-
 export async function getExpenses(): Promise<Expense[]> {
   const res = await fetch(`${API_URL}/expenses`, withAuth);
   const envelope = await parseEnvelope<{ expenses: Expense[] }>(res);
   const expenses = envelope.data?.expenses;
   return Array.isArray(expenses) ? expenses : [];
-}
-
-export async function deleteExpense(id: number): Promise<Expense> {
-  const res = await fetch(`${API_URL}/expenses/${id}`, {
-    method: "DELETE",
-    ...withAuth
-  });
-  const envelope = await parseEnvelope<{ expense: Expense }>(res);
-  if (!envelope.data?.expense) {
-    throw new Error("Missing expense in delete response");
-  }
-  return envelope.data.expense;
-}
-
-export async function updateExpense(
-    id: number,
-    data: { amount: number; category: string; notes: string }
-): Promise<Expense> {
-  const res = await fetch(`${API_URL}/expenses/${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-    ...withAuth
-  });
-  const envelope = await parseEnvelope<{ expense: Expense }>(res);
-  if (!envelope.data?.expense) {
-    throw new Error("Missing expense in update response");
-  }
-  return envelope.data.expense;
 }
 
 export async function getSummary(): Promise<Summary> {
@@ -208,9 +149,13 @@ export async function getInsights(payload: {
     messages: Array<{ role: "user" | "assistant"; content: string }>;
     isDefault?: boolean;
 }): Promise<InsightResponse> {
+  const csrf = await ensureCsrfToken();
   const res = await fetch(`${API_URL}/insights`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRF-Token": csrf
+    },
     body: JSON.stringify(payload),
     ...withAuth
   });
@@ -232,6 +177,13 @@ export async function fetchCsrfToken(): Promise<string> {
   return data.token;
 }
 
+let cachedCsrfToken: string | null = null;
+async function ensureCsrfToken(): Promise<string> {
+  if (cachedCsrfToken) return cachedCsrfToken;
+  cachedCsrfToken = await fetchCsrfToken();
+  return cachedCsrfToken;
+}
+
 export async function getTelegramStatus(): Promise<{ connected: boolean }> {
   const res = await fetch(`${API_URL}/integrations/telegram/status`, withAuth);
   return parseResponse<{ connected: boolean }>(res);
@@ -249,4 +201,77 @@ export async function startTelegramLink(
     ...withAuth
   });
   return parseResponse<{ url: string }>(res);
+}
+
+// --- CSRF-protected helpers for mutations ---
+
+export async function addExpense(data: {
+    amount: number;
+    category: string;
+    notes: string;
+}): Promise<Expense> {
+  const csrf = await ensureCsrfToken();
+  const res = await fetch(`${API_URL}/expenses`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRF-Token": csrf
+    },
+    body: JSON.stringify(data),
+    ...withAuth
+  });
+  const envelope = await parseEnvelope<{ expense: Expense }>(res);
+  if (!envelope.data?.expense) {
+    throw new Error("Missing expense in create response");
+  }
+  return envelope.data.expense;
+}
+
+export async function deleteExpense(id: number): Promise<Expense> {
+  const csrf = await ensureCsrfToken();
+  const res = await fetch(`${API_URL}/expenses/${id}`, {
+    method: "DELETE",
+    headers: { "X-CSRF-Token": csrf },
+    ...withAuth
+  });
+  const envelope = await parseEnvelope<{ expense: Expense }>(res);
+  if (!envelope.data?.expense) {
+    throw new Error("Missing expense in delete response");
+  }
+  return envelope.data.expense;
+}
+
+export async function updateExpense(
+    id: number,
+    data: { amount: number; category: string; notes: string }
+): Promise<Expense> {
+  const csrf = await ensureCsrfToken();
+  const res = await fetch(`${API_URL}/expenses/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRF-Token": csrf
+    },
+    body: JSON.stringify(data),
+    ...withAuth
+  });
+  const envelope = await parseEnvelope<{ expense: Expense }>(res);
+  if (!envelope.data?.expense) {
+    throw new Error("Missing expense in update response");
+  }
+  return envelope.data.expense;
+}
+
+export async function logout(): Promise<{ ok: boolean }> {
+  const csrf = await ensureCsrfToken();
+  const res = await fetch(`${API_URL}/auth/logout`, {
+    method: "POST",
+    headers: { "X-CSRF-Token": csrf },
+    ...withAuth
+  });
+  const envelope = await parseEnvelope<{ ok: boolean }>(res);
+  if (!envelope.data) {
+    throw new Error("Missing logout response data");
+  }
+  return envelope.data;
 }
