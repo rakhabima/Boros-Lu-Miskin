@@ -33,12 +33,6 @@ export function TelegramConnect() {
   const handleConnect = async () => {
     setError("");
     setConnecting(true);
-    const popup = window.open("about:blank", "_blank", "noopener,noreferrer");
-    if (!popup) {
-      setError("Popup blocked. Please allow popups for this site.");
-      setConnecting(false);
-      return;
-    }
     try {
       const csrf = await fetchCsrfToken();
       const res = await fetch("/integrations/telegram/start-link", {
@@ -63,13 +57,8 @@ export function TelegramConnect() {
         throw new Error("Telegram link URL missing or invalid in response");
       }
       console.log("Telegram connect URL:", telegramUrl);
-      popup.location.href = telegramUrl;
+      window.open(telegramUrl, "_blank");
     } catch (err) {
-      try {
-        popup.close();
-      } catch (_) {
-        /* ignore */
-      }
       setError("Could not start Telegram linking. Please try again.");
     } finally {
       setConnecting(false);
