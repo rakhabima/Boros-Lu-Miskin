@@ -112,7 +112,7 @@ integrationsRouter.post(
       const telegramId = message.from?.id;
       const text: string = message.text || "";
 
-      if (!chatId || !telegramId || !text) {
+      if (!chatId || !telegramId) {
         return ack();
       }
 
@@ -169,21 +169,31 @@ integrationsRouter.post(
         }
 
         console.warn("[TELEGRAM] /start without link token", { chatId, telegramId, text });
-        await sendTelegramMessage(chatId, "❌ Telegram is not connected.\nPlease connect your account from the web app.");
+        await sendTelegramMessage(
+          chatId,
+          "👋 Hi! Bot is active.\nSend a message or a photo and I'll acknowledge it."
+        );
         return ack();
       }
 
-      // For any other message, ensure chat is linked
-      const linked = await pool.query(
-        `SELECT app_user_id FROM telegram_links WHERE telegram_id = $1 AND confirmed = TRUE LIMIT 1`,
-        [telegramId]
-      );
-      if (linked.rows.length === 0) {
-        await sendTelegramMessage(chatId, "❌ Telegram is not connected.\nPlease connect your account from the web app.");
+      if (message.photo?.length) {
+        const largest = message.photo[message.photo.length - 1];
+        console.log("[TELEGRAM] photo received", {
+          chatId,
+          telegramId,
+          file_id: largest?.file_id,
+          caption: message.caption
+        });
+        await sendTelegramMessage(chatId, "📸 Photo received. (OCR not enabled yet.)");
         return ack();
       }
 
-      // Non-/link messages: ignore for now (future OCR/logic).
+      if (text) {
+        await sendTelegramMessage(chatId, `✅ Received: ${text}`);
+        return ack();
+      }
+
+      // Other message types: acknowledge but do nothing.
       return ack();
     } catch (err) {
       console.error("[TELEGRAM] webhook handler error", err);
