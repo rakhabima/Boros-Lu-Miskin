@@ -14,7 +14,7 @@ import {
 import { AuthCard } from "./components/AuthCard";
 import { CategorySelect } from "./components/CategorySelect";
 import { ExpenseTable } from "./components/ExpenseTable";
-import { TelegramConnect } from "./components/TelegramConnect";
+// import { TelegramConnect } from "./components/TelegramConnect";
 import type { ChatMessage, Expense, User } from "./types";
 import { APP_LOGO, APP_NAME } from "./branding";
 
@@ -505,9 +505,9 @@ export default function App() {
           </div>
         </div>
 
-        <div className="mb-6">
+        {/* <div className="mb-6">
           <TelegramConnect />
-        </div>
+        </div> */}
 
         {view === "insights" ? (
           <div className="rounded-lg border border-neutral-200 bg-white p-6 flex flex-col gap-4">

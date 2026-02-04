@@ -12,18 +12,54 @@ const TELEGRAM_API = config.telegram.botToken
   ? `https://api.telegram.org/bot${config.telegram.botToken}`
   : null;
 
-const sendTelegramMessage = async (chatId: number, text: string) => {
+type TelegramReplyMarkup = {
+  inline_keyboard?: Array<Array<{ text: string; callback_data: string }>>;
+  keyboard?: Array<Array<{ text: string }>>;
+  resize_keyboard?: boolean;
+  one_time_keyboard?: boolean;
+};
+
+const sendTelegramMessage = async (
+  chatId: number,
+  text: string,
+  replyMarkup?: TelegramReplyMarkup
+) => {
   if (!TELEGRAM_API) return;
   try {
     await fetch(`${TELEGRAM_API}/sendMessage`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text })
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {})
+      })
     });
   } catch (err) {
     console.error("[TELEGRAM] sendMessage failed", { err });
   }
 };
+
+const answerTelegramCallback = async (callbackQueryId: string) => {
+  if (!TELEGRAM_API) return;
+  try {
+    await fetch(`${TELEGRAM_API}/answerCallbackQuery`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ callback_query_id: callbackQueryId })
+    });
+  } catch (err) {
+    console.error("[TELEGRAM] answerCallbackQuery failed", { err });
+  }
+};
+
+const mainMenu = (): TelegramReplyMarkup => ({
+  inline_keyboard: [
+    [{ text: "📸 Send Receipt", callback_data: "menu_receipt" }],
+    [{ text: "📝 Add Note", callback_data: "menu_note" }],
+    [{ text: "ℹ️ Help", callback_data: "menu_help" }]
+  ]
+});
 
 /**
  * Start link flow: generates deep link token for Telegram /start
@@ -93,6 +129,7 @@ integrationsRouter.post(
       }
 
       const message = update.message;
+      const callbackQuery = update.callback_query;
       console.log("[TG MESSAGE TEXT]", message?.text);
       console.log("[TG CHAT ID]", message?.chat?.id);
       console.log("[TG FROM ID]", message?.from?.id);
@@ -102,6 +139,37 @@ integrationsRouter.post(
       }
       if (message?.text?.startsWith("/start link_")) {
         console.info("[TG START WITH TOKEN]");
+      }
+
+      if (callbackQuery && typeof callbackQuery === "object") {
+        const cbId = callbackQuery.id;
+        const cbData = callbackQuery.data || "";
+        const cbChatId = callbackQuery.message?.chat?.id;
+        const cbFromId = callbackQuery.from?.id;
+        console.log("[TG CALLBACK]", { cbId, cbData, cbChatId, cbFromId });
+        if (cbId) {
+          await answerTelegramCallback(cbId);
+        }
+        if (cbChatId) {
+          if (cbData === "menu_receipt") {
+            await sendTelegramMessage(
+              cbChatId,
+              "📸 Please send a clear photo of your receipt."
+            );
+          } else if (cbData === "menu_note") {
+            await sendTelegramMessage(
+              cbChatId,
+              "📝 Send a text note, e.g. “Lunch 45k food” or “Taxi 30k transport”."
+            );
+          } else {
+            await sendTelegramMessage(
+              cbChatId,
+              "ℹ️ You can send a receipt photo or a text note. I'll acknowledge it here.",
+              mainMenu()
+            );
+          }
+        }
+        return ack();
       }
 
       if (!message || typeof message !== "object") {
@@ -171,7 +239,8 @@ integrationsRouter.post(
         console.warn("[TELEGRAM] /start without link token", { chatId, telegramId, text });
         await sendTelegramMessage(
           chatId,
-          "👋 Hi! Bot is active.\nSend a message or a photo and I'll acknowledge it."
+          "👋 Welcome! I can receive receipt photos and text notes for your expenses.\nUse the buttons below or just send a photo/text. (OCR is not enabled yet.)",
+          mainMenu()
         );
         return ack();
       }
