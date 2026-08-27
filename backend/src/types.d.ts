@@ -22,5 +22,8 @@ export {};
 declare module "express-session" {
   interface SessionData {
     userId?: number;
+    // Set when a CSRF token is issued, purely so the session is persisted and
+    // its id stays stable — the token is bound to that id.
+    csrfBootstrap?: boolean;
   }
 }

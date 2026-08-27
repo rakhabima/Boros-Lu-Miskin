@@ -1,13 +1,15 @@
 import express from "express";
 import { randomUUID } from "crypto";
 import cors from "cors";
+import helmet from "helmet";
+import cookieParser from "cookie-parser";
 import session from "express-session";
 import passport from "passport";
-import csrf from "csurf";
-import RedisStore from "connect-redis";
-import { createClient } from "redis";
+import { doubleCsrf } from "csrf-csrf";
 import { config } from "./config.js";
 import { configurePassport } from "./auth/passport.js";
+import { sessionStore } from "./sessionStore.js";
+import { authLimiter, insightsLimiter } from "./middleware/rateLimit.js";
 import { authRouter } from "./routes/auth.js";
 import { expensesRouter } from "./routes/expenses.js";
 import { insightsRouter } from "./routes/insights.js";
@@ -18,68 +20,40 @@ const app = express();
 
 const normalizeOrigin = (origin: string) => origin.replace(/\/$/, "");
 
-const explicitAllowedOrigins = ["https://no-boros.rakhbim-project.my.id"];
-const rawAllowedOrigins = config.origins.frontend
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean)
-  .map(normalizeOrigin)
-  .filter((origin) => !origin.includes("localhost") && !origin.includes("127.0.0.1"));
+// Same-origin in production (frontend and API share the Vercel domain), so the
+// allowlist only ever needs the local dev frontend.
+const allowedOrigins = new Set<string>(
+  [
+    ...(config.session.isProd ? [] : ["http://localhost:5173"]),
+    ...config.origins.frontend.split(",").map((origin) => origin.trim())
+  ]
+    .filter(Boolean)
+    .map(normalizeOrigin)
+);
 
-const allowedOrigins = new Set<string>([
-  ...explicitAllowedOrigins.map(normalizeOrigin),
-  ...rawAllowedOrigins
-]);
-
-// Redis session store
-const redisClient = createClient({ url: config.redis.url });
-redisClient.connect().catch((err) => {
-  console.error("[REDIS] connection error", err);
-});
-const redisStore = new RedisStore({
-  client: redisClient,
-  ttl: config.session.ttlSeconds,
-  prefix: "sess:"
-});
-
-console.log("[CONFIG] origins", {
-  frontend: config.origins.frontend,
-  backend: config.origins.backend,
-  cors_allowlist: Array.from(allowedOrigins)
-});
+app.use(helmet());
 
 app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
-      if (allowedOrigins.has(origin)) return callback(null, true);
-      console.error("[CORS] blocked origin", {
-        origin,
-        allowed: Array.from(allowedOrigins)
-      });
+      if (allowedOrigins.has(normalizeOrigin(origin))) return callback(null, true);
+      console.warn("[CORS] blocked origin", { origin });
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: "100kb" }));
+app.use(cookieParser());
 
 app.use((req, res, next) => {
   req.requestId = randomUUID();
   res.setHeader("X-Request-Id", req.requestId);
-  console.log("[REQUEST] start", {
-    request_id: req.requestId,
-    method: req.method,
-    path: req.path
-  });
   next();
 });
 
-const isHttps =
-  config.origins.frontend.startsWith("https://") &&
-  config.origins.backend.startsWith("https://");
-
-// Behind Nginx TLS termination, trust X-Forwarded-* headers for secure cookies.
+// Behind Vercel/Nginx TLS termination, trust X-Forwarded-* headers.
 app.set("trust proxy", 1);
 
 app.use(
@@ -88,47 +62,43 @@ app.use(
     proxy: true,
     resave: false,
     saveUninitialized: false,
-    store: redisStore,
+    store: sessionStore,
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: true
+      secure: config.session.isProd,
+      maxAge: config.session.ttlSeconds * 1000
     }
   })
 );
-
-app.use((req, res, next) => {
-  console.log("[SESSION DEBUG] request", {
-    sessionID: req.sessionID,
-    session: req.session,
-    cookieHeader: req.headers.cookie,
-    secure: req.secure,
-    forwardedProto: req.headers["x-forwarded-proto"]
-  });
-  next();
-});
 
 configurePassport();
 app.use(passport.initialize());
 app.use(passport.session());
 
-// CSRF protection for browser routes (exclude Telegram webhook and public auth)
-const csrfProtection = csrf();
-const csrfExemptPaths = [
-  /^\/integrations\/telegram\/webhook/,
-  /^\/integrations\/telegram\/set-webhook/,
-  /^\/auth\/google/,
-  /^\/auth\/google\/callback/,
-  /^\/auth\/login/,
-  /^\/auth\/signup/
-];
-
-app.use((req, res, next) => {
-  if (csrfExemptPaths.some((rx) => rx.test(req.path))) return next();
-  // Allow safe methods without token
-  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return csrfProtection(req, res, next);
-  return csrfProtection(req, res, next);
+// CSRF: double-submit cookie. The Telegram webhook is exempt because it is
+// called by Telegram, not a browser, and authenticates via its secret header.
+const { doubleCsrfProtection } = doubleCsrf({
+  getSecret: () => config.session.secret,
+  getSessionIdentifier: (req) => req.sessionID || "",
+  cookieName: config.session.isProd ? "__Host-csrf" : "csrf",
+  cookieOptions: {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: config.session.isProd,
+    path: "/"
+  },
+  getCsrfTokenFromRequest: (req) => req.headers["x-csrf-token"],
+  skipCsrfProtection: (req) =>
+    req.path.startsWith("/integrations/telegram/webhook") ||
+    req.path.startsWith("/auth/google")
 });
+
+app.use(doubleCsrfProtection);
+
+app.use("/auth/login", authLimiter);
+app.use("/auth/signup", authLimiter);
+app.use("/insights", insightsLimiter);
 
 app.use("/auth", authRouter);
 app.use("/expenses", expensesRouter);

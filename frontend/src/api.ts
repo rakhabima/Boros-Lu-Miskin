@@ -1,7 +1,8 @@
 import type { Expense, InsightResponse, Summary, User } from "./types";
 
 const API_URL =
-  import.meta.env.VITE_API_BASE_URL?.toString() || "http://localhost:4000";
+  import.meta.env.VITE_API_BASE_URL?.toString() ||
+  (import.meta.env.PROD ? "/api" : "http://localhost:4000");
 
 const withAuth: RequestInit = {
   credentials: "include"
@@ -86,13 +87,15 @@ export async function signUp({
     password: string;
     name: string;
 }): Promise<User> {
+  const csrf = await ensureCsrfToken();
   const res = await fetch(`${API_URL}/auth/signup`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
     body: JSON.stringify({ email, password, name }),
     ...withAuth
   });
   const envelope = await parseEnvelope<{ user: User }>(res);
+  resetCsrfToken();
   if (!envelope.data?.user) {
     throw new Error("Missing user in signup response");
   }
@@ -106,13 +109,15 @@ export async function signIn({
     email: string;
     password: string;
 }): Promise<User> {
+  const csrf = await ensureCsrfToken();
   const res = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
     body: JSON.stringify({ email, password }),
     ...withAuth
   });
   const envelope = await parseEnvelope<{ user: User }>(res);
+  resetCsrfToken();
   if (!envelope.data?.user) {
     throw new Error("Missing user in login response");
   }
@@ -182,6 +187,12 @@ async function ensureCsrfToken(): Promise<string> {
   if (cachedCsrfToken) return cachedCsrfToken;
   cachedCsrfToken = await fetchCsrfToken();
   return cachedCsrfToken;
+}
+
+// The session id is rotated on login/signup/logout and the CSRF token is bound
+// to it, so a cached token is stale from that point on.
+function resetCsrfToken() {
+  cachedCsrfToken = null;
 }
 
 export async function getTelegramStatus(): Promise<{ connected: boolean }> {
@@ -273,6 +284,7 @@ export async function logout(): Promise<{ ok: boolean }> {
     ...withAuth
   });
   const envelope = await parseEnvelope<{ ok: boolean }>(res);
+  resetCsrfToken();
   if (!envelope.data) {
     throw new Error("Missing logout response data");
   }

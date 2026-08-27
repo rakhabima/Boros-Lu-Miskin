@@ -10,42 +10,30 @@ export const authRouter = Router();
 
 authRouter.get(
   "/google",
-  (req: Request, res: Response, next: NextFunction) => {
-    console.log("[OAUTH DEBUG] /auth/google start", {
-      request_id: req.requestId,
-      origin: req.headers.origin,
-      host: req.headers.host,
-      userAgent: req.headers["user-agent"]
-    });
-    next();
-  },
   passport.authenticate("google", { scope: ["profile", "email"] })
 );
 
 authRouter.get(
   "/google/callback",
-  (req: Request, res: Response, next: NextFunction) => {
-    console.log("[OAUTH DEBUG] /auth/google/callback start", {
-      request_id: req.requestId,
-      origin: req.headers.origin,
-      host: req.headers.host,
-      queryKeys: Object.keys(req.query || {}),
-      hasCode: typeof req.query?.code === "string"
-    });
-    next();
-  },
   passport.authenticate("google", {
     failureRedirect: `${config.origins.frontend}/login?error=oauth`
   }),
   (req: Request, res: Response, next: NextFunction) => {
-    if (req.user?.id && req.session) {
-      req.session.userId = req.user.id;
-      return req.session.save((err) => {
-        if (err) return next(err);
-        res.redirect(config.origins.frontend);
-      });
+    if (!req.user?.id || !req.session) {
+      return res.redirect(config.origins.frontend);
     }
-    res.redirect(config.origins.frontend);
+    const user = req.user;
+    return req.session.regenerate((regenErr) => {
+      if (regenErr) return next(regenErr);
+      return req.login(user, (loginErr) => {
+        if (loginErr) return next(loginErr);
+        req.session.userId = user.id;
+        req.session.save((saveErr) => {
+          if (saveErr) return next(saveErr);
+          res.redirect(config.origins.frontend);
+        });
+      });
+    });
   }
 );
 
@@ -64,12 +52,19 @@ authRouter.post("/logout", (req: Request, res: Response, next: NextFunction) => 
   });
 });
 
-// CSRF token fetcher for frontend
-authRouter.get("/csrf", (req: Request, res: Response) => {
+// CSRF token fetcher for frontend. The token is bound to the session id, and
+// saveUninitialized:false would drop an untouched session before the next
+// request — so persist it here to keep that id stable.
+authRouter.get("/csrf", (req: Request, res: Response, next: NextFunction) => {
   if (!req.csrfToken) {
     return res.status(500).json({ success: false, message: "CSRF not configured" });
   }
-  return res.json({ success: true, token: req.csrfToken() });
+  const token = req.csrfToken();
+  req.session.csrfBootstrap = true;
+  return req.session.save((err) => {
+    if (err) return next(err);
+    res.json({ success: true, token });
+  });
 });
 
 authRouter.get("/me", async (req: Request, res: Response, next: NextFunction) => {
@@ -88,12 +83,6 @@ authRouter.get("/me", async (req: Request, res: Response, next: NextFunction) =>
   }
 
   if (!req.user) {
-    console.log("[SESSION DEBUG] /auth/me unauthorized", {
-      request_id: req.requestId,
-      sessionID: req.sessionID,
-      session: req.session,
-      user: req.user
-    });
     return respondError(res, req, {
       status: 401,
       code: "AUTH_ME_UNAUTHORIZED",
@@ -102,12 +91,6 @@ authRouter.get("/me", async (req: Request, res: Response, next: NextFunction) =>
       authenticated: false
     });
   }
-  console.log("[SESSION DEBUG] /auth/me authorized", {
-    request_id: req.requestId,
-    sessionID: req.sessionID,
-    session: req.session,
-    user: req.user
-  });
   return respondSuccess(res, req, {
     code: "AUTH_ME_SUCCESS",
     message: "Authenticated user found",
@@ -160,7 +143,7 @@ authRouter.post(
         });
       }
 
-      const hash = await bcrypt.hash(password, 10);
+      const hash = await bcrypt.hash(password, 12);
       const updated = await pool.query(
         `UPDATE users
          SET password_hash = $1, name = $2
@@ -169,22 +152,25 @@ authRouter.post(
         [hash, name, existing.rows[0].id]
       );
 
-      return req.login(updated.rows[0], (err) => {
-        if (err) return next(err);
-        req.session.userId = updated.rows[0].id;
-        req.session.save((saveErr) => {
-          if (saveErr) return next(saveErr);
-          respondSuccess(res, req, {
-            code: "AUTH_SIGNUP_LINKED_SUCCESS",
-            message: "Email account linked and logged in",
-            data: { user: updated.rows[0] },
-            authenticated: true
+      return req.session.regenerate((regenErr) => {
+        if (regenErr) return next(regenErr);
+        return req.login(updated.rows[0], (err) => {
+          if (err) return next(err);
+          req.session.userId = updated.rows[0].id;
+          req.session.save((saveErr) => {
+            if (saveErr) return next(saveErr);
+            respondSuccess(res, req, {
+              code: "AUTH_SIGNUP_LINKED_SUCCESS",
+              message: "Email account linked and logged in",
+              data: { user: updated.rows[0] },
+              authenticated: true
+            });
           });
         });
       });
     }
 
-    const hash = await bcrypt.hash(password, 10);
+    const hash = await bcrypt.hash(password, 12);
     const created = await pool.query(
       `INSERT INTO users (email, name, password_hash)
        VALUES ($1, $2, $3)
@@ -214,11 +200,6 @@ authRouter.post(
 authRouter.post(
   "/login",
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-    console.log("[SESSION DEBUG] /auth/login before", {
-      request_id: req.requestId,
-      sessionID: req.sessionID,
-      session: req.session
-    });
     const { email, password } = req.body;
     const missingFields = ["email", "password"].filter(
       (field) => !req.body?.[field]
@@ -245,7 +226,6 @@ authRouter.post(
         status: 401,
         code: "AUTH_LOGIN_INVALID_CREDENTIALS",
         message: "Invalid email or password",
-        details: { field: "email" },
         authenticated: false
       });
     }
@@ -256,7 +236,6 @@ authRouter.post(
         status: 401,
         code: "AUTH_LOGIN_INVALID_CREDENTIALS",
         message: "Invalid email or password",
-        details: { field: "password" },
         authenticated: false
       });
     }
@@ -276,11 +255,6 @@ authRouter.post(
         req.session.userId = user.id;
         req.session.save((saveErr) => {
           if (saveErr) return next(saveErr);
-          console.log("[SESSION DEBUG] /auth/login after", {
-            request_id: req.requestId,
-            sessionID: req.sessionID,
-            session: req.session
-          });
           respondSuccess(res, req, {
             code: "AUTH_LOGIN_SUCCESS",
             message: "User logged in successfully",

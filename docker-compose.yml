@@ -9,14 +9,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-
-
   backend:
     build:
       context: ./backend
@@ -38,7 +30,6 @@ services:
       TELEGRAM_LINK_SECRET: ${TELEGRAM_LINK_SECRET}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN}
       BACKEND_ORIGIN: ${BACKEND_ORIGIN}
-      REDIS_URL: redis://redis:6379
     depends_on:
       - db
 
@@ -54,4 +45,3 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:

@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import { Router, type Request, type Response } from "express";
 import { pool } from "../db.js";
 import { config } from "../config.js";
@@ -89,9 +90,7 @@ integrationsRouter.post(
     const url = `https://t.me/${config.telegram.botUsername}?start=link_${token}__${uniqueSuffix}`;
     console.log("[TELEGRAM] start-link created", {
       user_id: req.user!.id,
-      token,
-      expires_at: expiresAt.toISOString(),
-      url
+      expires_at: expiresAt.toISOString()
     });
     return respondSuccess(res, req, {
       code: "TELEGRAM_START_LINK_SUCCESS",
@@ -115,7 +114,6 @@ integrationsRouter.post(
 
     try {
       const update = req.body || {};
-      console.log("[TG RAW UPDATE]", JSON.stringify(update, null, 2));
 
       if (!config.telegram.webhookSecret || !config.telegram.botToken) {
         console.error("[TELEGRAM] missing bot env");
@@ -123,30 +121,22 @@ integrationsRouter.post(
       }
 
       const secret = req.header("X-Telegram-Bot-Api-Secret-Token");
-      if (secret !== config.telegram.webhookSecret) {
-        console.warn("[TELEGRAM] invalid secret", { secret });
+      if (
+        !secret ||
+        secret.length !== config.telegram.webhookSecret.length ||
+        !timingSafeEqual(Buffer.from(secret), Buffer.from(config.telegram.webhookSecret))
+      ) {
+        console.warn("[TELEGRAM] rejected update with invalid secret");
         return ack();
       }
 
       const message = update.message;
       const callbackQuery = update.callback_query;
-      console.log("[TG MESSAGE TEXT]", message?.text);
-      console.log("[TG CHAT ID]", message?.chat?.id);
-      console.log("[TG FROM ID]", message?.from?.id);
-
-      if (message?.text === "/start") {
-        console.warn("[TG START WITHOUT TOKEN]");
-      }
-      if (message?.text?.startsWith("/start link_")) {
-        console.info("[TG START WITH TOKEN]");
-      }
 
       if (callbackQuery && typeof callbackQuery === "object") {
         const cbId = callbackQuery.id;
         const cbData = callbackQuery.data || "";
         const cbChatId = callbackQuery.message?.chat?.id;
-        const cbFromId = callbackQuery.from?.id;
-        console.log("[TG CALLBACK]", { cbId, cbData, cbChatId, cbFromId });
         if (cbId) {
           await answerTelegramCallback(cbId);
         }
@@ -194,7 +184,7 @@ integrationsRouter.post(
           const payload = verifyLinkToken(token);
           if (!payload) {
             await sendTelegramMessage(chatId, "⚠️ Link tidak valid atau sudah kedaluwarsa.");
-            console.warn("[TELEGRAM] invalid token", { chatId, telegramId, raw });
+            console.warn("[TELEGRAM] invalid link token", { telegramId });
             return ack();
           }
           // confirm only existing pending link rows
@@ -211,12 +201,8 @@ integrationsRouter.post(
             (pending.rows[0].expires_at && new Date(pending.rows[0].expires_at) < new Date())
           ) {
             await sendTelegramMessage(chatId, "⚠️ Link tidak valid atau sudah kedaluwarsa.");
-            console.warn("[TELEGRAM] pending not found/expired", {
-              chatId,
-              telegramId,
-              token,
-              expires_at: pending.rows[0]?.expires_at,
-              confirmed: pending.rows[0]?.confirmed
+            console.warn("[TELEGRAM] pending link not found or expired", {
+              telegramId
             });
             return ack();
           }
@@ -232,11 +218,11 @@ integrationsRouter.post(
             chatId,
             "✅ Telegram account successfully connected.\nYou can now send receipt photos to record expenses."
           );
-          console.log("[TELEGRAM] link confirmed", { chatId, telegramId, user_id: payload.uid });
+          console.log("[TELEGRAM] link confirmed", { user_id: payload.uid });
           return ack();
         }
 
-        console.warn("[TELEGRAM] /start without link token", { chatId, telegramId, text });
+        console.warn("[TELEGRAM] /start without link token", { telegramId });
         await sendTelegramMessage(
           chatId,
           "👋 Welcome! I can receive receipt photos and text notes for your expenses.\nUse the buttons below or just send a photo/text. (OCR is not enabled yet.)",
@@ -248,10 +234,8 @@ integrationsRouter.post(
       if (message.photo?.length) {
         const largest = message.photo[message.photo.length - 1];
         console.log("[TELEGRAM] photo received", {
-          chatId,
           telegramId,
-          file_id: largest?.file_id,
-          caption: message.caption
+          file_id: largest?.file_id
         });
         await sendTelegramMessage(chatId, "📸 Photo received. (OCR not enabled yet.)");
         return ack();
@@ -317,6 +301,7 @@ integrationsRouter.get(
  */
 integrationsRouter.post(
   "/telegram/set-webhook",
+  requireAuth,
   asyncHandler(async (_req: Request, res: Response) => {
     if (!config.telegram.botToken || !config.telegram.webhookSecret || !config.origins.backend) {
       return res.status(500).json({ message: "Missing Telegram config or backend origin" });

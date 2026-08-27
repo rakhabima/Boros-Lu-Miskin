@@ -11,10 +11,6 @@ export const requireAuth = async (
   const sessionId = req.sessionID;
 
   if (!session) {
-    console.log("[AUTH DEBUG] requireAuth no session", {
-      request_id: req.requestId,
-      sessionID: sessionId
-    });
     return respondError(res, req, {
       status: 401,
       code: "AUTH_SESSION_MISSING",
@@ -26,10 +22,6 @@ export const requireAuth = async (
 
   const sessionKeys = Object.keys(session).filter((key) => key !== "cookie");
   if (sessionKeys.length === 0) {
-    console.log("[AUTH DEBUG] requireAuth empty session", {
-      request_id: req.requestId,
-      sessionID: sessionId
-    });
     return respondError(res, req, {
       status: 401,
       code: "AUTH_SESSION_EMPTY",
@@ -41,11 +33,6 @@ export const requireAuth = async (
 
   const userId = session.userId;
   if (!userId) {
-    console.log("[AUTH DEBUG] requireAuth missing session userId", {
-      request_id: req.requestId,
-      sessionID: sessionId,
-      sessionKeys
-    });
     return respondError(res, req, {
       status: 401,
       code: "AUTH_SESSION_NO_USER",
@@ -62,11 +49,6 @@ export const requireAuth = async (
         [userId]
       );
       if (result.rows.length === 0) {
-        console.log("[AUTH DEBUG] requireAuth userId not found", {
-          request_id: req.requestId,
-          sessionID: sessionId,
-          userId
-        });
         return respondError(res, req, {
           status: 401,
           code: "AUTH_SESSION_USER_NOT_FOUND",
@@ -81,10 +63,5 @@ export const requireAuth = async (
     }
   }
 
-  console.log("[AUTH DEBUG] requireAuth authorized", {
-    request_id: req.requestId,
-    sessionID: sessionId,
-    userId: req.user?.id
-  });
   return next();
 };

@@ -2,19 +2,29 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const required = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "SESSION_SECRET"];
+const required = [
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "SESSION_SECRET",
+  "DB_USER",
+  "DB_PASSWORD"
+];
 
-const missing = required.filter((key) => !process.env[key]);
+// DATABASE_URL supersedes the discrete DB_* vars (Neon/Supabase style).
+const missing = process.env.DATABASE_URL
+  ? required.filter((key) => key.startsWith("DB_") ? false : !process.env[key])
+  : required.filter((key) => !process.env[key]);
+
 if (missing.length > 0) {
   throw new Error(`Missing required env vars: ${missing.join(", ")}`);
 }
 
 export const config = {
   db: {
-    user: process.env.DB_USER || "rakhabimaaryasambarana",
+    user: process.env.DB_USER as string,
     host: process.env.DB_HOST || "localhost",
     name: process.env.DB_NAME || "expense_tracker",
-    password: process.env.DB_PASSWORD || "12345",
+    password: process.env.DB_PASSWORD as string,
     port: Number(process.env.DB_PORT || 5432)
   },
   auth: {
@@ -44,8 +54,5 @@ export const config = {
     webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || "",
     botUsername: process.env.TELEGRAM_BOT_USERNAME || "",
     linkSecret: process.env.TELEGRAM_LINK_SECRET || process.env.SESSION_SECRET || ""
-  },
-  redis: {
-    url: process.env.REDIS_URL || "redis://localhost:6379"
   }
 };

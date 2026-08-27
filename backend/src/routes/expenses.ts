@@ -6,6 +6,52 @@ import { respondError, respondSuccess } from "../utils/response.js";
 
 export const expensesRouter = Router();
 
+const MAX_AMOUNT = 1_000_000_000_000; // 1e12, comfortably above any real expense
+const MAX_CATEGORY = 64;
+const MAX_NOTES = 1000;
+
+/**
+ * Validates the shared expense body. Returns an error payload or the clean row.
+ * `amount` arrives as JSON so it may be a string, a negative, NaN or Infinity —
+ * NUMERIC would happily store some of those and reject others with a 500.
+ */
+type ParsedExpense =
+  | { ok: false; code: string; message: string; details: unknown }
+  | { ok: true; amount: number; category: string; notes: string | null };
+
+const parseExpenseBody = (body: any): ParsedExpense => {
+  const amount = Number(body?.amount);
+  const category = typeof body?.category === "string" ? body.category.trim() : "";
+  const notes = typeof body?.notes === "string" ? body.notes.trim() : "";
+
+  if (!Number.isFinite(amount) || amount <= 0 || amount > MAX_AMOUNT) {
+    return {
+      ok: false,
+      code: "EXPENSE_INVALID_AMOUNT",
+      message: "Amount must be a positive number",
+      details: { field: "amount", max: MAX_AMOUNT }
+    };
+  }
+  if (!category || category.length > MAX_CATEGORY) {
+    return {
+      ok: false,
+      code: "EXPENSE_INVALID_CATEGORY",
+      message: "Category is required",
+      details: { field: "category", maxLength: MAX_CATEGORY }
+    };
+  }
+  if (notes.length > MAX_NOTES) {
+    return {
+      ok: false,
+      code: "EXPENSE_INVALID_NOTES",
+      message: "Notes too long",
+      details: { field: "notes", maxLength: MAX_NOTES }
+    };
+  }
+
+  return { ok: true, amount, category, notes: notes || null };
+};
+
 /**
  * Create expense
  */
@@ -13,17 +59,13 @@ expensesRouter.post(
   "/",
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
-    const { amount, category, notes } = req.body;
-
-    if (!amount || !category) {
-      const missingFields = [];
-      if (!amount) missingFields.push("amount");
-      if (!category) missingFields.push("category");
+    const parsed = parseExpenseBody(req.body);
+    if (!parsed.ok) {
       return respondError(res, req, {
         status: 400,
-        code: "EXPENSE_CREATE_VALIDATION_FAILED",
-        message: "Missing required fields",
-        details: { fields: missingFields },
+        code: parsed.code,
+        message: parsed.message,
+        details: parsed.details,
         authenticated: true
       });
     }
@@ -32,7 +74,7 @@ expensesRouter.post(
       `INSERT INTO expenses (amount, category, notes, user_id)
        VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [amount, category, notes || null, req.user!.id]
+      [parsed.amount, parsed.category, parsed.notes, req.user!.id]
     );
 
     return respondSuccess(res, req, {
@@ -162,16 +204,13 @@ expensesRouter.put(
       });
     }
 
-    const { amount, category, notes } = req.body;
-    if (!amount || !category) {
-      const missingFields = [];
-      if (!amount) missingFields.push("amount");
-      if (!category) missingFields.push("category");
+    const parsed = parseExpenseBody(req.body);
+    if (!parsed.ok) {
       return respondError(res, req, {
         status: 400,
-        code: "EXPENSE_UPDATE_VALIDATION_FAILED",
-        message: "Missing required fields",
-        details: { fields: missingFields },
+        code: parsed.code,
+        message: parsed.message,
+        details: parsed.details,
         authenticated: true
       });
     }
@@ -181,7 +220,7 @@ expensesRouter.put(
        SET amount = $1, category = $2, notes = $3
        WHERE id = $4 AND user_id = $5
        RETURNING *`,
-      [amount, category, notes || null, id, req.user!.id]
+      [parsed.amount, parsed.category, parsed.notes, id, req.user!.id]
     );
 
     if (result.rows.length === 0) {

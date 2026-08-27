@@ -55,3 +55,16 @@ ALTER TABLE telegram_links ALTER COLUMN app_user_id DROP NOT NULL;
 ALTER TABLE telegram_links ALTER COLUMN expires_at DROP NOT NULL;
 
 CREATE INDEX IF NOT EXISTS telegram_links_code_idx ON telegram_links (code);
+
+-- Every expense query filters by owner; without this Postgres seq-scans.
+CREATE INDEX IF NOT EXISTS expenses_user_id_created_at_idx
+  ON expenses (user_id, created_at DESC);
+
+-- Fixed-window rate limit counters, shared across serverless instances.
+-- (The session table `user_sessions` is created automatically on boot.)
+CREATE TABLE IF NOT EXISTS rate_limits (
+  key TEXT PRIMARY KEY,
+  count INTEGER NOT NULL DEFAULT 0,
+  expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS rate_limits_expires_at_idx ON rate_limits (expires_at);
