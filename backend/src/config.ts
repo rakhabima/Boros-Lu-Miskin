@@ -35,7 +35,7 @@ export const config = {
     apiKey: process.env.OPENROUTER_API_KEY || "",
     model:
       process.env.OPENROUTER_MODEL ||
-      "liquid/lfm-2.5-1.2b-thinking:free",
+      "openrouter/free",
     baseUrl: process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
     siteUrl: process.env.OPENROUTER_SITE_URL || "",
     siteName: process.env.OPENROUTER_SITE_NAME || ""
