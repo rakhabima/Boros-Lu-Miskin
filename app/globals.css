@@ -15,15 +15,16 @@ body {
 @keyframes typingDot3 { 0% { opacity: 0; } 50% { opacity: 1; } 75%, 100% { opacity: 0; } }
 
 .chat-fade-in { animation: chatFadeIn 150ms ease-out; }
-.typing-dot { animation: 1.2s step-end infinite; }
+.typing-dot { animation-duration: 1.2s; animation-timing-function: step-end; animation-iteration-count: infinite; }
 .typing-dot:nth-child(1) { animation-name: typingDot1; }
 .typing-dot:nth-child(2) { animation-name: typingDot2; }
 .typing-dot:nth-child(3) { animation-name: typingDot3; }
 
+/* .typing-dot is deliberately exempt: it only cycles opacity, with no motion to
+   trigger vestibular discomfort, and it is the sole "AI is thinking" cue. */
 @media (prefers-reduced-motion: reduce) {
   .animate-pulse,
-  .chat-fade-in,
-  .typing-dot {
+  .chat-fade-in {
     animation: none;
   }
 }

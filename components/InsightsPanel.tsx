@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { askInsights } from "@/actions/insights";
 import type { ChatMessage } from "@/types";
 
@@ -13,6 +13,13 @@ export function InsightsPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [lastSentIndex, setLastSentIndex] = useState<number | null>(null);
+  const transcriptRef = useRef<HTMLDivElement>(null);
+
+  // Pin to the newest message, including the typing indicator while it shows.
+  useEffect(() => {
+    const el = transcriptRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, loading]);
 
   // Restore after mount, not in a useState initializer: this component is
   // server-rendered, so reading storage during render would hydrate-mismatch.
@@ -84,6 +91,7 @@ export function InsightsPanel() {
       </div>
 
       <div
+        ref={transcriptRef}
         className="rounded-md border border-neutral-200 bg-neutral-50 p-4 text-sm space-y-3 max-h-[420px] overflow-y-auto"
         aria-live="polite"
       >
