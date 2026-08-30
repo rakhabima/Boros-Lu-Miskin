@@ -1,0 +1,11 @@
+INSERT INTO expenses (id, amount, category, notes, created_at, user_id) VALUES (2, 12000.00, 'Food', 'gorengan', '2026-01-21 22:28:53.936535', NULL);
+INSERT INTO expenses (id, amount, category, notes, created_at, user_id) VALUES (3, 15000.00, 'Transport', 'gojek pulang', '2026-01-21 22:29:07.511567', NULL);
+INSERT INTO expenses (id, amount, category, notes, created_at, user_id) VALUES (4, 15000.00, 'Food', NULL, '2026-01-22 17:20:08.245542', NULL);
+INSERT INTO expenses (id, amount, category, notes, created_at, user_id) VALUES (5, 10000.00, 'Food', NULL, '2026-01-22 17:36:23.541927', NULL);
+INSERT INTO expenses (id, amount, category, notes, created_at, user_id) VALUES (6, 10000.00, 'Food', NULL, '2026-01-22 18:02:26.595418', NULL);
+INSERT INTO expenses (id, amount, category, notes, created_at, user_id) VALUES (7, 10000.00, 'Food', NULL, '2026-01-22 18:02:27.848238', NULL);
+INSERT INTO expenses (id, amount, category, notes, created_at, user_id) VALUES (8, 10000.00, 'Food', NULL, '2026-01-22 18:02:28.9176', NULL);
+INSERT INTO expenses (id, amount, category, notes, created_at, user_id) VALUES (9, 10000.00, 'Food', NULL, '2026-01-22 18:02:30.349532', NULL);
+INSERT INTO expenses (id, amount, category, notes, created_at, user_id) VALUES (10, 10000.00, 'Shopping', NULL, '2026-01-22 18:02:36.248009', NULL);
+INSERT INTO expenses (id, amount, category, notes, created_at, user_id) VALUES (11, 10000.00, 'Shopping', NULL, '2026-01-22 18:02:37.814439', NULL);
+INSERT INTO expenses (id, amount, category, notes, created_at, user_id) VALUES (12, 10000.00, 'Shopping', NULL, '2026-01-22 18:02:42.866667', NULL);
