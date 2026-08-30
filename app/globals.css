@@ -10,22 +10,20 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes typingBlink {
-  0%, 80%, 100% { opacity: 0.2; }
-  40% { opacity: 1; }
-}
+@keyframes typingDot1 { 0% { opacity: 1; } 75%, 100% { opacity: 0; } }
+@keyframes typingDot2 { 0% { opacity: 0; } 25% { opacity: 1; } 75%, 100% { opacity: 0; } }
+@keyframes typingDot3 { 0% { opacity: 0; } 50% { opacity: 1; } 75%, 100% { opacity: 0; } }
 
 .chat-fade-in { animation: chatFadeIn 150ms ease-out; }
-.typing-dot { animation: typingBlink 1s infinite; }
-.typing-delay-1 { animation-delay: 0.15s; }
-.typing-delay-2 { animation-delay: 0.3s; }
+.typing-dot { animation: 1.2s step-end infinite; }
+.typing-dot:nth-child(1) { animation-name: typingDot1; }
+.typing-dot:nth-child(2) { animation-name: typingDot2; }
+.typing-dot:nth-child(3) { animation-name: typingDot3; }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-pulse,
   .chat-fade-in,
-  .typing-dot,
-  .typing-delay-1,
-  .typing-delay-2 {
+  .typing-dot {
     animation: none;
   }
 }

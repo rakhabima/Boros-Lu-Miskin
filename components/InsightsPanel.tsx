@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { askInsights } from "@/actions/insights";
 import type { ChatMessage } from "@/types";
 
 const defaultInsightPrompt = "give me insights about my expenses";
+const storageKey = "insights-chat";
 
 export function InsightsPanel() {
   const [prompt, setPrompt] = useState(defaultInsightPrompt);
@@ -12,6 +13,29 @@ export function InsightsPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [lastSentIndex, setLastSentIndex] = useState<number | null>(null);
+
+  // Restore after mount, not in a useState initializer: this component is
+  // server-rendered, so reading storage during render would hydrate-mismatch.
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(storageKey);
+      if (saved) setMessages(JSON.parse(saved));
+    } catch {
+      // Corrupt or unavailable storage: start with an empty transcript.
+    }
+  }, []);
+
+  // Never clears the key: this runs on mount too, while the restore above has
+  // only queued its state update, so deleting here would wipe the transcript
+  // before it lands.
+  useEffect(() => {
+    if (messages.length === 0) return;
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-50)));
+    } catch {
+      // Private mode / quota: persistence is best-effort.
+    }
+  }, [messages]);
 
   async function handleInsights() {
     if (loading) return;
@@ -92,8 +116,8 @@ export function InsightsPanel() {
             </div>
             <div className="flex items-center gap-1">
               <span className="typing-dot">•</span>
-              <span className="typing-dot typing-delay-1">•</span>
-              <span className="typing-dot typing-delay-2">•</span>
+              <span className="typing-dot">•</span>
+              <span className="typing-dot">•</span>
             </div>
           </div>
         )}
