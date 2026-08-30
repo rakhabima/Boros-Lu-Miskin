@@ -8,28 +8,24 @@ import type { User } from "@/types";
 
 const COOKIE = "sid";
 
-const USER_COLUMNS = "id, google_id, email, name, avatar_url";
-
 /**
  * Resolves the session cookie to a user. Wrapped in React's cache() so a layout
  * and several components calling requireUser() in one request cost one query.
+ * The join keeps that at ONE round trip: on serverless the DB hop dominates
+ * page render time, and every page in the app starts here.
  */
 export const getSession = cache(async (): Promise<User | null> => {
   const sid = (await cookies()).get(COOKIE)?.value;
   if (!sid) return null;
 
   const { rows } = await pool.query(
-    `SELECT sess FROM user_sessions WHERE sid = $1 AND expire > NOW()`,
+    `SELECT u.id, u.google_id, u.email, u.name, u.avatar_url
+     FROM user_sessions s
+     JOIN users u ON u.id = (s.sess->>'userId')::int
+     WHERE s.sid = $1 AND s.expire > NOW()`,
     [sid]
   );
-  const userId = rows[0]?.sess?.userId;
-  if (!userId) return null;
-
-  const result = await pool.query(
-    `SELECT ${USER_COLUMNS} FROM users WHERE id = $1`,
-    [userId]
-  );
-  return result.rows[0] ?? null;
+  return rows[0] ?? null;
 });
 
 export async function requireUser(): Promise<User> {

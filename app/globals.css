@@ -21,6 +21,7 @@ body {
 .typing-delay-2 { animation-delay: 0.3s; }
 
 @media (prefers-reduced-motion: reduce) {
+  .animate-pulse,
   .chat-fade-in,
   .typing-dot,
   .typing-delay-1,
