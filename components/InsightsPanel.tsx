@@ -1,18 +1,101 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { askInsights } from "@/actions/insights";
 import type { ChatMessage } from "@/types";
 
 const defaultInsightPrompt = "give me insights about my expenses";
 const storageKey = "insights-chat";
 
+type ChatState = {
+  messages: ChatMessage[];
+  loading: boolean;
+  error: string;
+  lastSentIndex: number | null;
+};
+
+// Module scope, not component state: an in-flight request has to outlive this
+// panel unmounting when the user switches pages. The server action's fetch was
+// never cancelled by navigation, but its `await` used to resolve into a dead
+// component, so the reply was discarded.
+const emptyState: ChatState = {
+  messages: [],
+  loading: false,
+  error: "",
+  lastSentIndex: null
+};
+let state = emptyState;
+const listeners = new Set<() => void>();
+
+function setState(patch: Partial<ChatState>) {
+  state = { ...state, ...patch };
+  // Persist here rather than from a component effect, so a reply that lands
+  // while the panel is unmounted still survives a reload.
+  if (patch.messages) {
+    try {
+      // Clearing matters: rolling a failed FIRST message back to an empty
+      // transcript must wipe the stored optimistic copy, or a reload restores
+      // an unanswered question and replays it as history.
+      if (state.messages.length === 0) sessionStorage.removeItem(storageKey);
+      else sessionStorage.setItem(storageKey, JSON.stringify(state.messages.slice(-50)));
+    } catch {
+      // Private mode / quota: persistence is best-effort.
+    }
+  }
+  for (const listener of listeners) listener();
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+const getSnapshot = () => state;
+// SSR renders client components too, and module scope is shared across requests
+// there. Always emitting the empty state keeps one user's chat out of another's
+// HTML, and matches the pre-restore client render so hydration lines up.
+const getServerSnapshot = () => emptyState;
+
+async function sendMessage(text: string): Promise<{ ok: boolean }> {
+  if (state.loading) return { ok: false };
+  const previous = state.messages;
+  const next: ChatMessage[] = [...previous, { role: "user", content: text }];
+  setState({
+    messages: next,
+    lastSentIndex: next.length - 1,
+    loading: true,
+    error: ""
+  });
+  try {
+    const result = await askInsights(text, next);
+    if ("error" in result) {
+      // Roll the optimistic message back so a failed send leaves no unanswered
+      // question in the transcript to be replayed as history.
+      setState({ error: result.error, messages: previous, lastSentIndex: null });
+      return { ok: false };
+    }
+    setState({
+      messages: [...next, { role: "assistant", content: result.text }]
+    });
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to get insights";
+    setState({ error: message, messages: previous, lastSentIndex: null });
+    return { ok: false };
+  } finally {
+    setState({ loading: false });
+  }
+}
+
 export function InsightsPanel() {
+  const { messages, loading, error, lastSentIndex } = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot
+  );
   const [prompt, setPrompt] = useState(defaultInsightPrompt);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [lastSentIndex, setLastSentIndex] = useState<number | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
 
   // Pin to the newest message, including the typing indicator while it shows.
@@ -23,65 +106,25 @@ export function InsightsPanel() {
 
   // Restore after mount, not in a useState initializer: this component is
   // server-rendered, so reading storage during render would hydrate-mismatch.
+  // Only seeds an empty store, so navigating back never clobbers a live chat.
   useEffect(() => {
+    if (state.messages.length > 0) return;
     try {
       const saved = sessionStorage.getItem(storageKey);
-      if (saved) setMessages(JSON.parse(saved));
+      if (saved) setState({ messages: JSON.parse(saved) });
     } catch {
       // Corrupt or unavailable storage: start with an empty transcript.
     }
   }, []);
 
-  // Never clears the key: this runs on mount too, while the restore above has
-  // only queued its state update, so deleting here would wipe the transcript
-  // before it lands.
-  useEffect(() => {
-    if (messages.length === 0) return;
-    try {
-      sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-50)));
-    } catch {
-      // Private mode / quota: persistence is best-effort.
-    }
-  }, [messages]);
-
   async function handleInsights() {
     if (loading) return;
     const trimmedPrompt = prompt.trim();
     if (!trimmedPrompt) return;
-    setError("");
-    setLoading(true);
     setPrompt("");
-    try {
-      const nextMessages: ChatMessage[] = [
-        ...messages,
-        { role: "user", content: trimmedPrompt }
-      ];
-      setMessages(nextMessages);
-      setLastSentIndex(nextMessages.length - 1);
-      const result = await askInsights(trimmedPrompt, nextMessages);
-      if ("error" in result) {
-        setError(result.error);
-        // Roll back the optimistic message and hand the text back, so a failed
-        // send does not leave an unanswered question in the transcript (which
-        // would then be replayed as history) or lose what the user typed.
-        setMessages(messages);
-        setLastSentIndex(null);
-        setPrompt(trimmedPrompt);
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: result.text }
-        ]);
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to get insights";
-      setError(message);
-      setMessages(messages);
-      setLastSentIndex(null);
-      setPrompt(trimmedPrompt);
-    } finally {
-      setLoading(false);
-    }
+    const { ok } = await sendMessage(trimmedPrompt);
+    // Still mounted and it failed: hand the text back so nothing is lost.
+    if (!ok) setPrompt(trimmedPrompt);
   }
 
   return (
