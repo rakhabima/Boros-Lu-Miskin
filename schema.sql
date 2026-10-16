@@ -90,3 +90,48 @@ CREATE TABLE IF NOT EXISTS rate_limits (
   expires_at TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS rate_limits_expires_at_idx ON rate_limits (expires_at);
+
+-- iPhone Shortcut receipt capture. A device is a long-lived bearer token
+-- minted by exchanging a single-use connect code; only SHA-256 hashes of either
+-- are stored, so a DB leak does not leak working credentials.
+CREATE TABLE IF NOT EXISTS devices (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_used_at TIMESTAMPTZ,
+  revoked_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS devices_user_id_idx ON devices (user_id);
+
+CREATE TABLE IF NOT EXISTS device_connect_codes (
+  code_hash TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
+-- One row per authenticated /api/receipts request. Never holds the image.
+CREATE TABLE IF NOT EXISTS receipt_attempts (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  device_id INTEGER REFERENCES devices(id) ON DELETE SET NULL,
+  status TEXT NOT NULL,
+  error_code TEXT,
+  model TEXT,
+  duration_ms INTEGER,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS receipt_attempts_user_id_created_at_idx
+  ON receipt_attempts (user_id, created_at DESC);
+
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'web';
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS needs_review BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS dedupe_key TEXT;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS device_id INTEGER REFERENCES devices(id) ON DELETE SET NULL;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS extraction JSONB;
+-- Real insert time. created_at can be a past receipt date (noon Jakarta), so
+-- "saved in the last 10 minutes" needs its own column.
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+CREATE UNIQUE INDEX IF NOT EXISTS expenses_user_id_dedupe_key_idx
+  ON expenses (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL;

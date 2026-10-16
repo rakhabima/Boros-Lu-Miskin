@@ -1,6 +1,6 @@
 const MAX_AMOUNT = 1_000_000_000_000; // 1e12, comfortably above any real expense
 const MAX_CATEGORY = 64;
-const MAX_NOTES = 1000;
+export const MAX_NOTES = 1000;
 
 export type ParsedExpense =
   | { ok: false; message: string; field: string }

@@ -26,6 +26,7 @@ export default async function AppLayout({
           <div className="flex gap-2">
             <NavLink href="/">Expenses</NavLink>
             <NavLink href="/insights">Get Insights with AI</NavLink>
+            <NavLink href="/devices">Devices</NavLink>
             <form action={signOut}>
               <button
                 type="submit"

@@ -45,17 +45,26 @@ export async function pruneRateLimits(): Promise<void> {
 export const AUTH_LIMIT = { limit: 10, windowSec: 15 * 60 };
 export const AI_LIMIT = { limit: 30, windowSec: 60 * 60 };
 
+export const RECEIPT_IP_LIMIT = { limit: 30, windowSec: 60 * 60 };
+export const RECEIPT_DEVICE_LIMIT = { limit: 20, windowSec: 60 * 60 };
+export const CONNECT_IP_LIMIT = { limit: 10, windowSec: 15 * 60 };
+
 export const AUTH_IP_LIMIT = { limit: 10, windowSec: 15 * 60 };
 // Deliberately looser than the IP limit. It exists to catch a targeted attack
 // that rotates source IPs; a tight per-account bound would let anyone lock a
 // known user out of their own account for 15 minutes just by guessing wrong.
 export const AUTH_EMAIL_LIMIT = { limit: 30, windowSec: 15 * 60 };
 
-/** Best-effort client IP. Vercel sets x-forwarded-for; the first hop is the client. */
+/**
+ * Client IP, trusting exactly one proxy hop. The LAST x-forwarded-for entry is
+ * the one our own proxy appended; anything left of it is client-supplied and
+ * spoofable. Vercel overwrites the header with a single value (last == first);
+ * Nginx with `$proxy_add_x_forwarded_for` appends the real peer.
+ */
 export async function clientIp(): Promise<string> {
   const h = await headers();
   const fwd = h.get("x-forwarded-for");
-  return fwd?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
+  return fwd?.split(",").at(-1)?.trim() || h.get("x-real-ip") || "unknown";
 }
 
 /**

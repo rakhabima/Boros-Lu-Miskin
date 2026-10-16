@@ -8,14 +8,22 @@ export function formatIDR(value: number) {
   }).format(value);
 }
 
-export const CATEGORIES = [
-  "All",
+// The receipt reader may only pick from this list. Expenses can still carry
+// other (custom) categories; the UI merges those in from the user's data.
+export const BUILT_IN_CATEGORIES = [
   "Food",
   "Transport",
   "Shopping",
+  "Bills",
+  "Entertainment",
+  "Health",
+  "Pets",
+  "Transfer",
   "Subscription",
   "Other"
 ];
+
+export const CATEGORIES = ["All", ...BUILT_IN_CATEGORIES];
 
 export const RANGE_PRESETS = ["Last 7 days", "Last 30 days", "Last 365 days"];
 

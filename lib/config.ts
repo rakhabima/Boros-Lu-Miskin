@@ -37,6 +37,14 @@ export const config = {
     siteUrl: process.env.OPENROUTER_SITE_URL || "",
     siteName: process.env.OPENROUTER_SITE_NAME || ""
   },
+  // Receipt reader (9router, OpenAI-compatible). Separate from OpenRouter,
+  // which stays for AI Insights only.
+  vision: {
+    url: process.env.NINEROUTER_URL || "",
+    key: process.env.NINEROUTER_KEY || "",
+    model: process.env.NINEROUTER_MODEL || "parse-struk",
+    dailyCap: Number(process.env.RECEIPT_DAILY_CAP || 50)
+  },
   session: {
     secret: process.env.SESSION_SECRET as string,
     isProd: process.env.NODE_ENV === "production",
