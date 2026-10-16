@@ -3,7 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import { addExpenseAction, type ExpenseFormState } from "@/actions/expenses";
 import { CategorySelect } from "./CategorySelect";
-import { CATEGORIES } from "@/lib/format";
+import { BUILT_IN_CATEGORIES } from "@/lib/format";
 
 export function AddExpenseForm() {
   const [category, setCategory] = useState("Food");
@@ -35,7 +35,7 @@ export function AddExpenseForm() {
           label="Expense category"
           name="category"
           value={category}
-          options={CATEGORIES.filter((c) => c !== "All")}
+          options={BUILT_IN_CATEGORIES}
           onChange={setCategory}
           className="md:col-span-1"
         />

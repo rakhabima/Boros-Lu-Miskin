@@ -12,6 +12,7 @@ export type Expense = {
   category: string;
   notes: string | null;
   created_at: string;
+  needs_review?: boolean;
 };
 
 export type InsightResponse = {

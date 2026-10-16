@@ -8,7 +8,7 @@ import {
   updateExpenseAction,
   type ExpenseFormState
 } from "@/actions/expenses";
-import { CATEGORIES, formatIDR } from "@/lib/format";
+import { BUILT_IN_CATEGORIES, formatIDR } from "@/lib/format";
 import type { Expense } from "@/types";
 
 function DeleteConfirmModal({
@@ -113,7 +113,7 @@ function EditExpenseModal({
             label="Edit category"
             name="category"
             value={category}
-            options={CATEGORIES.filter((c) => c !== "All")}
+            options={[...new Set([...BUILT_IN_CATEGORIES, expense.category])]}
             onChange={setCategory}
           />
           <input

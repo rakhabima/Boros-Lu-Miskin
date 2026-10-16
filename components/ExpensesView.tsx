@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ExpenseFilters } from "./ExpenseFilters";
 import { ExpenseModals } from "./ExpenseModals";
 import { ExportModal } from "./ExportModal";
-import { filterExpenses, formatIDR, PAGE_SIZE } from "@/lib/format";
+import { CATEGORIES, filterExpenses, formatIDR, PAGE_SIZE } from "@/lib/format";
 import type { Expense } from "@/types";
 
 type Summary = {
@@ -63,6 +63,11 @@ export function ExpensesView({
     [expenses, category, range]
   );
 
+  const categories = useMemo(
+    () => [...new Set([...CATEGORIES, ...expenses.map((e) => e.category)])],
+    [expenses]
+  );
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(Math.max(1, page), totalPages);
   const paged = useMemo(
@@ -84,6 +89,7 @@ export function ExpensesView({
     <>
       <ExpenseFilters
         category={category}
+        categories={categories}
         range={range}
         onCategoryChange={changeCategory}
         onRangeChange={changeRange}

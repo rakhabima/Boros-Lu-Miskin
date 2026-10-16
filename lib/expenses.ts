@@ -5,7 +5,7 @@ type ValidExpense = { amount: number; category: string; notes: string | null };
 
 export async function listExpenses(userId: number): Promise<Expense[]> {
   const { rows } = await pool.query(
-    `SELECT id, amount, category, notes, created_at
+    `SELECT id, amount, category, notes, created_at, needs_review
      FROM expenses
      WHERE user_id = $1
      ORDER BY created_at DESC`,
@@ -33,7 +33,8 @@ export async function updateExpense(
   e: ValidExpense
 ): Promise<Expense | null> {
   const { rows } = await pool.query(
-    `UPDATE expenses SET amount = $1, category = $2, notes = $3
+    `UPDATE expenses SET amount = $1, category = $2, notes = $3,
+       needs_review = FALSE
      WHERE id = $4 AND user_id = $5
      RETURNING id, amount, category, notes, created_at`,
     [e.amount, e.category, e.notes, id, userId]

@@ -1,7 +1,7 @@
 "use client";
 
 import { CategorySelect } from "./CategorySelect";
-import { CATEGORIES, RANGE_PRESETS } from "@/lib/format";
+import { RANGE_PRESETS } from "@/lib/format";
 
 /**
  * Presentational only. Filter state lives in ExpensesView so a change is an
@@ -9,11 +9,13 @@ import { CATEGORIES, RANGE_PRESETS } from "@/lib/format";
  */
 export function ExpenseFilters({
   category,
+  categories,
   range,
   onCategoryChange,
   onRangeChange
 }: {
   category: string;
+  categories: string[];
   range: string;
   onCategoryChange: (value: string) => void;
   onRangeChange: (value: string) => void;
@@ -23,7 +25,7 @@ export function ExpenseFilters({
       <CategorySelect
         label="Filter by category"
         value={category}
-        options={CATEGORIES}
+        options={categories}
         onChange={onCategoryChange}
         className="w-full md:w-48"
       />
