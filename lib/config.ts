@@ -40,11 +40,30 @@ export const config = {
   // Receipt reader (9router, OpenAI-compatible). Separate from OpenRouter,
   // which stays for AI Insights only.
   vision: {
-    url: process.env.NINEROUTER_URL || "",
-    key: process.env.NINEROUTER_KEY || "",
+    // Base URL ending in /v1; /chat/completions is appended. Server-only.
+    baseUrl: (process.env.NINEROUTER_BASE_URL || "").replace(/\/+$/, ""),
+    key: process.env.NINEROUTER_API_KEY || "",
     model: process.env.NINEROUTER_MODEL || "parse-struk",
-    dailyCap: Number(process.env.RECEIPT_DAILY_CAP || 50)
+    dailyCap: Number(process.env.RECEIPT_DAILY_CAP || 50),
+    hourlyLimit: Number(process.env.RECEIPT_HOURLY_LIMIT || 30)
   },
+  sheets: {
+    // Per-user OAuth mirror. Checked on first use (missingSheetsConfig), not
+    // at startup, so the app still runs where Sheets is not set up.
+    redirectUri: process.env.SHEETS_OAUTH_REDIRECT_URI || "",
+    encKey: process.env.SHEETS_TOKEN_ENC_KEY || "",
+    // Legacy shared Apps Script webhook, only for these (lowercased) emails.
+    webhookUrl: process.env.SHEETS_WEBHOOK_URL || "",
+    secret: process.env.SHEETS_WEBHOOK_SECRET || "",
+    legacyEmails: (process.env.SHEETS_LEGACY_WEBHOOK_EMAILS || "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+    // Tests only: send every Google API call to a local mock. Never in production.
+    googleMockUrl:
+      process.env.NODE_ENV === "production" ? "" : process.env.GOOGLE_API_MOCK_URL || ""
+  },
+  shortcutInstallUrl: process.env.SHORTCUT_INSTALL_URL || "",
   session: {
     secret: process.env.SESSION_SECRET as string,
     isProd: process.env.NODE_ENV === "production",
