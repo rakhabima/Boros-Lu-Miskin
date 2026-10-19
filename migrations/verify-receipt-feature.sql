@@ -3,11 +3,11 @@
 --   psql "$DATABASE_URL" -f migrations/verify-receipt-feature.sql
 BEGIN TRANSACTION READ ONLY;
 
-\echo '--- 1. new tables (expect 3 rows)'
+\echo '--- 1. new tables (expect 4 rows)'
 SELECT table_name
 FROM information_schema.tables
 WHERE table_schema = 'public'
-  AND table_name IN ('devices', 'device_connect_codes', 'receipt_attempts')
+  AND table_name IN ('devices', 'device_connect_codes', 'receipt_attempts', 'sheets_connections')
 ORDER BY table_name;
 
 \echo '--- 2. new expenses columns (expect 6 rows, all ok = t)'
@@ -30,6 +30,25 @@ LEFT JOIN information_schema.columns c
   ON c.table_schema = 'public' AND c.table_name = 'expenses'
  AND c.column_name = e.column_name
 ORDER BY e.column_name;
+
+\echo '--- 2b. connect/token/settings columns (expect 5 rows, all ok = t)'
+WITH expected(table_name, column_name, data_type, is_nullable, column_default) AS (
+  VALUES
+    ('device_connect_codes', 'consumed_at',   'timestamp with time zone', 'YES', NULL),
+    ('device_connect_codes', 'created_at',    'timestamp with time zone', 'NO',  'now()'),
+    ('devices',              'token_prefix',  'text',                     'YES', NULL),
+    ('devices',              'scope',         'text',                     'NO',  '''receipts:create''::text'),
+    ('users',                'sheets_mirror', 'boolean',                  'NO',  'false')
+)
+SELECT e.table_name, e.column_name, c.data_type, c.column_default,
+       (c.data_type = e.data_type
+        AND c.is_nullable = e.is_nullable
+        AND c.column_default IS NOT DISTINCT FROM e.column_default) AS ok
+FROM expected e
+LEFT JOIN information_schema.columns c
+  ON c.table_schema = 'public' AND c.table_name = e.table_name
+ AND c.column_name = e.column_name
+ORDER BY e.table_name, e.column_name;
 
 \echo '--- 3. all expenses columns (expect the 6 original + the 6 above, nothing else)'
 SELECT column_name, data_type

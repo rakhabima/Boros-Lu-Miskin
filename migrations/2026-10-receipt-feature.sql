@@ -1,14 +1,18 @@
 -- Receipt feature (iPhone Shortcut -> /api/receipts), phase 1.
 --
 -- Adds:
---   tables   devices, device_connect_codes, receipt_attempts
+--   tables   devices, device_connect_codes, receipt_attempts, sheets_connections
 --   columns  expenses.source, needs_review, dedupe_key, device_id, extraction,
 --            inserted_at
+--            device_connect_codes.consumed_at, created_at
+--            devices.token_prefix, scope
+--            users.sheets_mirror
 --   indexes  devices_user_id_idx, receipt_attempts_user_id_created_at_idx,
 --            expenses_user_id_dedupe_key_idx (unique, partial)
 --
 -- Additive only: no DROP, no DELETE, no change to any existing column, and
--- telegram_links / ai_usage are not touched. Every statement is IF NOT EXISTS,
+-- telegram_links / ai_usage are not touched. The only pre-existing table that
+-- gains a column is users (sheets_mirror, NOT NULL DEFAULT FALSE, no rewrite). Every statement is IF NOT EXISTS,
 -- so running it twice is a no-op the second time.
 --
 -- Run once, all or nothing:
@@ -69,3 +73,33 @@ ALTER TABLE expenses ADD COLUMN IF NOT EXISTS inserted_at TIMESTAMPTZ NOT NULL D
 
 CREATE UNIQUE INDEX IF NOT EXISTS expenses_user_id_dedupe_key_idx
   ON expenses (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL;
+
+-- One-tap connect (device-code flow). Codes are now consumed, not deleted,
+-- so a conditional UPDATE can make single use race-safe. Tokens get a short
+-- display prefix and a scope; the only scope today is receipts:create.
+ALTER TABLE device_connect_codes ADD COLUMN IF NOT EXISTS consumed_at TIMESTAMPTZ;
+ALTER TABLE device_connect_codes ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE devices ADD COLUMN IF NOT EXISTS token_prefix TEXT;
+ALTER TABLE devices ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'receipts:create';
+
+-- Per-user opt-in: mirror receipt expenses to the Google Sheets webhook.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS sheets_mirror BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Per-user Google Sheets mirror (separate OAuth grant, drive.file scope).
+-- One connection per user. The refresh token is AES-256-GCM ciphertext
+-- (iv + tag + ciphertext, key from SHEETS_TOKEN_ENC_KEY); no raw tokens.
+-- Mirroring needs users.sheets_mirror AND a usable connection.
+CREATE TABLE IF NOT EXISTS sheets_connections (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  google_email TEXT,
+  spreadsheet_id TEXT NOT NULL,
+  spreadsheet_url TEXT NOT NULL,
+  refresh_token_enc TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active'
+    CHECK (status IN ('active', 'needs_reconnect', 'error')),
+  last_synced_at TIMESTAMPTZ,
+  last_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
