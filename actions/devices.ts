@@ -2,12 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
-import { createConnectCode, revokeDevice } from "@/lib/devices";
-
-export async function createConnectCodeAction(): Promise<{ code: string }> {
-  const user = await requireUser();
-  return { code: await createConnectCode(user.id) };
-}
+import { revokeDevice } from "@/lib/devices";
 
 export async function revokeDeviceAction(formData: FormData): Promise<void> {
   const user = await requireUser();
