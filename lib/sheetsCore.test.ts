@@ -7,6 +7,7 @@ import {
   encryptToken,
   parseEncKey,
   sheetRow,
+  SHEET_HEADER,
   signState,
   verifyState
 } from "./sheetsCore.ts";
@@ -51,13 +52,13 @@ test("verifyState accepts only our cookie for this user and this state", () => {
 });
 
 test("sheetRow keeps column order and escapes formula-like text", () => {
-  assert.deepEqual(
-    sheetRow({ date: "2026-10-16", merchant: "Indomaret", amount: 45000, category: "Food", notes: null, needs_review: false }),
-    ["2026-10-16", "Indomaret", 45000, "Food", "", false]
-  );
-  const row = sheetRow({ date: "2026-10-16", merchant: "=IMPORTXML(1)", amount: 1, category: "Other", notes: "+62 811", needs_review: true });
-  assert.equal(row[1], "'=IMPORTXML(1)");
-  assert.equal(row[4], "'+62 811");
+  const base = { recorded_at: "2026-10-16T17:30:05Z", date: "2026-10-16", merchant: "Indomaret", amount: 45000, category: "Food", notes: null, needs_review: false };
+  assert.equal(SHEET_HEADER.length, 7);
+  assert.deepEqual(sheetRow(base), ["2026-10-17 00:30:05", "2026-10-16", "Indomaret", "Food", 45000, "", false]);
+  const row = sheetRow({ ...base, merchant: "=IMPORTXML(1)", notes: "+62 811", needs_review: true });
+  assert.equal(row[2], "'=IMPORTXML(1)");
+  assert.equal(row[5], "'+62 811");
+  assert.equal(row.length, SHEET_HEADER.length);
 });
 
 test("classify Google failures", () => {

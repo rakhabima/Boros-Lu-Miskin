@@ -63,30 +63,30 @@ export function verifyState(
 
 // --- Rows ----------------------------------------------------------------------
 
-/**
- * Column order = the legacy webhook payload (date, merchant, amount, category,
- * notes, needs_review), which the Apps Script sheet was built from. Keep it
- * stable: existing reports address these columns by position.
- */
-export const SHEET_HEADER = ["Tanggal", "Merchant", "Total", "Kategori", "Catatan", "Perlu dicek"];
+export const SHEET_HEADER = ["Waktu Catat", "Tanggal", "Merchant", "Kategori", "Total", "Items", "Perlu dicek"];
 
 export type MirrorRow = {
+  recorded_at: string; // ISO instant the expense was saved
   date: string; // yyyy-MM-dd
   merchant: string;
   amount: number;
   category: string;
-  notes: string | null;
+  notes: string | null; // item list; the "Items" column
   needs_review: boolean;
 };
 
+/** "yyyy-MM-dd HH:mm:ss" in Asia/Jakarta (sv-SE formats exactly like that). */
+const jakartaStamp = (iso: string) =>
+  new Date(iso).toLocaleString("sv-SE", { timeZone: "Asia/Jakarta" });
+
 /**
- * Written with valueInputOption=USER_ENTERED so the date becomes a real date
- * and the amount a number. Text cells come from the receipt image, so a
- * leading = + - @ is escaped with ' to stop it running as a formula.
+ * Written with valueInputOption=USER_ENTERED so the timestamp and date become
+ * real date-times and the amount a number. Text cells come from the receipt
+ * image, so a leading = + - @ is escaped with ' to stop it running as a formula.
  */
 export function sheetRow(r: MirrorRow): (string | number | boolean)[] {
   const text = (s: string | null) => (s && /^[=+\-@]/.test(s) ? `'${s}` : s ?? "");
-  return [r.date, text(r.merchant), r.amount, text(r.category), text(r.notes), r.needs_review];
+  return [jakartaStamp(r.recorded_at), r.date, text(r.merchant), text(r.category), r.amount, text(r.notes), r.needs_review];
 }
 
 // --- Google error classification -------------------------------------------------

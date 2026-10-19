@@ -206,7 +206,7 @@ async function handle(req: Request, device: { id: number; user_id: number }): Pr
        (amount, category, notes, user_id, created_at, source, needs_review, dedupe_key, device_id, extraction)
      VALUES ($1, $2, $3, $4, COALESCE($5::timestamp, NOW()), 'receipt', $6, $7, $8, $9)
      ON CONFLICT (user_id, dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING
-     RETURNING id`,
+     RETURNING id, inserted_at`,
     [
       parsed.amount,
       parsed.category,
@@ -230,6 +230,7 @@ async function handle(req: Request, device: { id: number; user_id: number }): Pr
 
   after(() =>
     mirrorReceipt(userId, {
+      recorded_at: rows[0].inserted_at.toISOString(),
       date: when.date,
       merchant: receipt.merchant,
       amount: parsed.amount,

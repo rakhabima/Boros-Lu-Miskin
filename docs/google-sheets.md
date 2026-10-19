@@ -13,9 +13,11 @@ Drive and appends one row per receipt expense.
 - Mirroring runs after the receipt response. A Google failure never fails or
   slows the receipt; it only changes the connection status on /devices.
 
-Columns (sheet tab "Pengeluaran"): Tanggal, Merchant, Total, Kategori,
-Catatan, Perlu dicek. Same order as the legacy webhook payload. Written with
-`USER_ENTERED`, so dates and amounts are real dates and numbers; text that
+Columns (sheet tab "Pengeluaran"): Waktu Catat (when the expense was saved,
+Asia/Jakarta `yyyy-MM-dd HH:mm:ss`), Tanggal (receipt date), Merchant,
+Kategori, Total, Items (the item list), Perlu dicek. Spreadsheets created
+before this layout keep their old header. Written with
+`USER_ENTERED`, so timestamps, dates and amounts are real date-times and numbers; text that
 starts with `= + - @` is prefixed with `'` so it can never run as a formula.
 
 ## Google Cloud setup (once)
