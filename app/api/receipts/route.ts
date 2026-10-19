@@ -1,15 +1,16 @@
+import { after } from "next/server";
 import { pool } from "@/lib/db";
 import { config } from "@/lib/config";
-import { deviceFromBearer } from "@/lib/devices";
+import { deviceFromBearer, isInsecure, RECEIPT_SCOPE } from "@/lib/devices";
 import { parseExpenseBody } from "@/lib/validation";
 import { formatIDR } from "@/lib/format";
 import {
   checkRateLimit,
   clientIp,
-  RECEIPT_DEVICE_LIMIT,
   RECEIPT_IP_LIMIT
 } from "@/lib/rateLimit";
 import { readReceipt, VisionError } from "@/lib/vision";
+import { mirrorReceipt } from "@/lib/sheets";
 import {
   buildNotes,
   dedupeKey,
@@ -18,7 +19,10 @@ import {
   jakartaToday,
   normalize,
   isPossibleDuplicate,
-  resolveDate
+  LOW_CONFIDENCE,
+  resolveDate,
+  userCategories,
+  visionPrompt
 } from "@/lib/receipt";
 
 // 45 s vision budget + DB round trips. 60 s fits every Vercel plan, Fluid or not.
@@ -63,6 +67,7 @@ const json = (http: number, body: Body) =>
   );
 
 export async function POST(req: Request) {
+  if (isInsecure(req)) return json(403, { ok: false, message: "HTTPS wajib." });
   try {
     const ip = await clientIp();
     const byIp = await checkRateLimit(`rcpt:ip:${ip}`, RECEIPT_IP_LIMIT.limit, RECEIPT_IP_LIMIT.windowSec);
@@ -70,7 +75,7 @@ export async function POST(req: Request) {
       return json(429, { ok: false, message: "Terlalu banyak kiriman. Coba lagi nanti." });
     }
 
-    const device = await deviceFromBearer(req.headers.get("authorization"));
+    const device = await deviceFromBearer(req.headers.get("authorization"), RECEIPT_SCOPE);
     if (!device) {
       return json(401, { ok: false, message: "Perangkat belum terhubung atau sudah dicabut." });
     }
@@ -100,37 +105,19 @@ export async function POST(req: Request) {
 async function handle(req: Request, device: { id: number; user_id: number }): Promise<Outcome> {
   const userId = device.user_id;
 
-  const byDevice = await checkRateLimit(
-    `rcpt:dev:${device.id}`,
-    RECEIPT_DEVICE_LIMIT.limit,
-    RECEIPT_DEVICE_LIMIT.windowSec
-  );
-  if (!byDevice.allowed) {
-    return fail(429, "rate_limited", "device_rate_limit", "Terlalu banyak kiriman. Coba lagi nanti.");
+  // Per user, not per device: a second phone must not double the allowance.
+  const byUser = await checkRateLimit(`rcpt:u:${userId}`, config.vision.hourlyLimit, 60 * 60);
+  if (!byUser.allowed) {
+    return fail(429, "rate_limited", "user_rate_limit", "Terlalu banyak kiriman. Coba lagi nanti.");
   }
 
   // --- Input ---
   if (Number(req.headers.get("content-length") || 0) > MAX_REQUEST_BYTES) {
     return fail(413, "rejected", "request_too_large", "Gambar terlalu besar.");
   }
-  const raw = await req.text();
-  if (raw.length > MAX_REQUEST_BYTES) {
-    return fail(413, "rejected", "request_too_large", "Gambar terlalu besar.");
-  }
-  let payload: { mime?: unknown; image?: unknown } | null = null;
-  try {
-    payload = JSON.parse(raw);
-  } catch {}
-  if (
-    typeof payload?.image !== "string" ||
-    (payload.mime !== "image/jpeg" && payload.mime !== "image/png")
-  ) {
-    return fail(400, "rejected", "bad_request", "Format kiriman salah.");
-  }
-  const image = Buffer.from(payload.image.replace(/\s/g, ""), "base64");
-  if (image.length > MAX_IMAGE_BYTES) {
-    return fail(413, "rejected", "image_too_large", "Gambar terlalu besar.");
-  }
+  const image = await readImage(req);
+  if (image === "too_large") return fail(413, "rejected", "image_too_large", "Gambar terlalu besar.");
+  if (!image) return fail(400, "rejected", "bad_request", "Format kiriman salah.");
   const mime = imageType(image);
   if (!mime) return fail(415, "rejected", "bad_image_type", "Gambar harus JPEG atau PNG.");
 
@@ -150,10 +137,15 @@ async function handle(req: Request, device: { id: number; user_id: number }): Pr
     return fail(429, "rate_limited", "daily_cap", "Batas harian struk tercapai. Coba lagi besok.");
   }
 
-  // --- Read ---
+  // --- Read: the model picks from this user's categories (built-ins first) ---
+  const custom = await pool.query(
+    `SELECT DISTINCT category FROM expenses WHERE user_id = $1 LIMIT 100`,
+    [userId]
+  );
+  const categories = userCategories(custom.rows.map((r) => r.category));
   let text: string;
   try {
-    text = await readReceipt(image, mime);
+    text = await readReceipt(image, mime, visionPrompt(categories));
   } catch (err) {
     const code = err instanceof VisionError ? err.code : "vision_error";
     return code === "timeout"
@@ -163,7 +155,7 @@ async function handle(req: Request, device: { id: number; user_id: number }): Pr
 
   let receipt;
   try {
-    receipt = normalize(extractJson(text));
+    receipt = normalize(extractJson(text), categories);
   } catch {
     return fail(502, "failed", "parse_failed", "Struk tidak terbaca. Coba foto yang lebih jelas.");
   }
@@ -171,6 +163,8 @@ async function handle(req: Request, device: { id: number; user_id: number }): Pr
   const when = resolveDate(receipt.date, jakartaToday());
   const review = [...when.review];
   if (!receipt.merchant) review.push("no_merchant");
+  if (!receipt.categoryMatched) review.push("category_unknown");
+  if (receipt.confidence !== null && receipt.confidence < LOW_CONFIDENCE) review.push("low_confidence");
   const result = {
     merchant: receipt.merchant || null,
     total: receipt.total,
@@ -198,11 +192,12 @@ async function handle(req: Request, device: { id: number; user_id: number }): Pr
   if (!parsed.ok) return fail(422, "failed", `invalid_${parsed.field}`, "Data struk tidak valid. Catat manual ya.");
 
   const recent = await pool.query(
-    `SELECT amount, extraction->>'merchant' AS merchant FROM expenses
+    `SELECT amount, extraction->>'merchant' AS merchant, to_char(created_at, 'YYYY-MM-DD') AS date
+     FROM expenses
      WHERE user_id = $1 AND source = 'receipt' AND inserted_at > NOW() - INTERVAL '10 minutes'`,
     [userId]
   );
-  const similar = isPossibleDuplicate(receipt, recent.rows);
+  const similar = isPossibleDuplicate({ ...receipt, date: when.date }, recent.rows);
   if (similar) review.push("possible_duplicate");
 
   const needsReview = review.length > 0;
@@ -221,11 +216,28 @@ async function handle(req: Request, device: { id: number; user_id: number }): Pr
       needsReview,
       key,
       device.id,
-      JSON.stringify({ model: config.vision.model, review, merchant: receipt.merchant, items: receipt.items })
+      JSON.stringify({
+        model: config.vision.model,
+        review,
+        merchant: receipt.merchant,
+        items: receipt.items,
+        confidence: receipt.confidence
+      })
     ]
   );
   // Lost a race with an identical concurrent request.
   if (!rows[0]) return (await findDuplicate(userId, key))!;
+
+  after(() =>
+    mirrorReceipt(userId, {
+      date: when.date,
+      merchant: receipt.merchant,
+      amount: parsed.amount,
+      category: parsed.category,
+      notes: parsed.notes,
+      needs_review: needsReview
+    })
+  );
 
   const label = `${receipt.merchant || "Transaksi"} ${formatIDR(receipt.total)}`;
   return {
@@ -266,4 +278,23 @@ async function findDuplicate(userId: number, key: string): Promise<Outcome | nul
       needs_review: rows[0].needs_review
     }
   };
+}
+
+/** Multipart (field "image") or JSON {image: base64}. The magic-byte check later decides the type. */
+async function readImage(req: Request): Promise<Buffer | "too_large" | null> {
+  if ((req.headers.get("content-type") || "").startsWith("multipart/form-data")) {
+    const file = (await req.formData().catch(() => null))?.get("image");
+    if (!(file instanceof Blob)) return null;
+    if (file.size > MAX_IMAGE_BYTES) return "too_large";
+    return Buffer.from(await file.arrayBuffer());
+  }
+  const raw = await req.text();
+  if (raw.length > MAX_REQUEST_BYTES) return "too_large";
+  let payload: { image?: unknown } | null = null;
+  try {
+    payload = JSON.parse(raw);
+  } catch {}
+  if (typeof payload?.image !== "string") return null;
+  const image = Buffer.from(payload.image.replace(/\s/g, ""), "base64");
+  return image.length > MAX_IMAGE_BYTES ? "too_large" : image;
 }

@@ -4,10 +4,28 @@ import { createHash } from "node:crypto";
 import { BUILT_IN_CATEGORIES } from "./format.ts";
 import { MAX_NOTES } from "./validation.ts";
 
-export const VISION_PROMPT =
+/** The ported Apps Script prompt; only the category list and `confidence` are new. */
+export const visionPrompt = (categories: string[]) =>
   "Baca struk atau bukti transaksi pada gambar ini. Balas HANYA dengan satu objek JSON, tanpa teks lain, dengan field: merchant (string), tanggal (string YYYY-MM-DD, atau null jika tidak tercantum di gambar), total (angka rupiah tanpa titik atau simbol), kategori (pilih tepat satu dari: " +
-  BUILT_IN_CATEGORIES.join(", ") +
-  "), items (array objek {nama, qty, harga}, boleh kosong jika tidak ada rincian). Jangan menebak tanggal.";
+  categories.join(", ") +
+  "), items (array objek {nama, qty, harga}, boleh kosong jika tidak ada rincian), confidence (angka 0 sampai 1, seberapa yakin bacaanmu benar). Jangan menebak tanggal.";
+
+/** Below this the expense is saved but flagged for review. */
+export const LOW_CONFIDENCE = 0.6;
+
+/**
+ * Built-ins first, then the user's own categories (from their expenses).
+ * Custom names go into the prompt, so keep only plain ones: anything with
+ * punctuation that could break the list, or a case-insensitive repeat, is dropped.
+ */
+export function userCategories(custom: string[]): string[] {
+  const seen = new Set(BUILT_IN_CATEGORIES.map((c) => c.toLowerCase()));
+  const extra = custom
+    .map((c) => c.trim())
+    .filter((c) => /^[\p{L}\p{N} &/-]{1,64}$/u.test(c))
+    .filter((c) => !seen.has(c.toLowerCase()) && seen.add(c.toLowerCase()));
+  return [...BUILT_IN_CATEGORIES, ...extra.slice(0, 30)];
+}
 
 export const sha256 = (data: string | Buffer) =>
   createHash("sha256").update(data).digest("hex");
@@ -62,20 +80,31 @@ export type Receipt = {
   date: string | null; // yyyy-MM-dd if present and well-formed
   total: number;
   category: string;
+  /** false when the model's category was missing or not in the user's list. */
+  categoryMatched: boolean;
   items: Item[];
+  /** 0..1 as reported by the model; null if missing or out of range. */
+  confidence: number | null;
 };
 
 /** Tolerates missing or empty fields: transfer proofs have no date or items. */
-export function normalize(raw: Record<string, unknown>): Receipt {
+export function normalize(
+  raw: Record<string, unknown>,
+  categories: string[] = BUILT_IN_CATEGORIES
+): Receipt {
   const opt = (v: unknown) => (v === null || v === undefined || v === "" ? null : toNumber(v));
   const items = Array.isArray(raw.items) ? raw.items : [];
   const date = typeof raw.tanggal === "string" ? raw.tanggal.trim() : "";
   const kategori = typeof raw.kategori === "string" ? raw.kategori.trim().toLowerCase() : "";
+  const matched = categories.find((c) => c.toLowerCase() === kategori);
+  const conf = typeof raw.confidence === "string" ? Number(raw.confidence) : raw.confidence;
   return {
     merchant: String(raw.merchant ?? "").trim(),
     date: isRealDate(date) ? date : null,
     total: toNumber(raw.total),
-    category: BUILT_IN_CATEGORIES.find((c) => c.toLowerCase() === kategori) ?? "Other",
+    category: matched ?? "Other",
+    categoryMatched: matched !== undefined,
+    confidence: typeof conf === "number" && conf >= 0 && conf <= 1 ? conf : null,
     items: items
       .filter((i): i is Record<string, unknown> => !!i && typeof i === "object")
       .map((i) => ({ nama: String(i.nama ?? "").trim(), qty: opt(i.qty), harga: opt(i.harga) }))
@@ -85,17 +114,19 @@ export function normalize(raw: Record<string, unknown>): Receipt {
 
 /**
  * Soft duplicate: a fresh screenshot of the same transaction has different
- * bytes (status bar clock), so the image hash misses it. Same amount and same
- * merchant (case-insensitive) as a receipt saved moments ago is a hint, not a
- * rejection. The caller supplies `recent` already limited to the time window.
+ * bytes (status bar clock), so the image hash misses it. Same amount, same
+ * merchant (case-insensitive) and same date as a receipt saved moments ago is
+ * a hint, not a rejection. The caller supplies `recent` already limited to the
+ * time window.
  */
 export const isPossibleDuplicate = (
-  r: { total: number; merchant: string },
-  recent: Array<{ amount: number; merchant: string | null }>
+  r: { total: number; merchant: string; date: string },
+  recent: Array<{ amount: number; merchant: string | null; date: string }>
 ) =>
   recent.some(
     (e) =>
       Number(e.amount) === r.total &&
+      e.date === r.date &&
       (e.merchant ?? "").trim().toLowerCase() === r.merchant.trim().toLowerCase()
   );
 

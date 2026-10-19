@@ -46,7 +46,6 @@ export const AUTH_LIMIT = { limit: 10, windowSec: 15 * 60 };
 export const AI_LIMIT = { limit: 30, windowSec: 60 * 60 };
 
 export const RECEIPT_IP_LIMIT = { limit: 30, windowSec: 60 * 60 };
-export const RECEIPT_DEVICE_LIMIT = { limit: 20, windowSec: 60 * 60 };
 export const CONNECT_IP_LIMIT = { limit: 10, windowSec: 15 * 60 };
 
 export const AUTH_IP_LIMIT = { limit: 10, windowSec: 15 * 60 };

@@ -1,5 +1,4 @@
 import { config } from "./config";
-import { VISION_PROMPT } from "./receipt";
 
 const BUDGET_MS = 45_000;
 // First attempt gets most of the budget; a retry only happens with what is left.
@@ -18,9 +17,10 @@ export class VisionError extends Error {
  * timeout or 5xx only; 4xx are config errors and fail immediately.
  * Never logs the image.
  */
-export async function readReceipt(image: Buffer, mime: string): Promise<string> {
-  const { url, key, model } = config.vision;
-  if (!url || !key) throw new VisionError("not_configured");
+export async function readReceipt(image: Buffer, mime: string, prompt: string): Promise<string> {
+  const { baseUrl, key, model } = config.vision;
+  if (!baseUrl || !key) throw new VisionError("not_configured");
+  const url = `${baseUrl}/chat/completions`;
 
   const body = JSON.stringify({
     model,
@@ -29,7 +29,7 @@ export async function readReceipt(image: Buffer, mime: string): Promise<string> 
       {
         role: "user",
         content: [
-          { type: "text", text: VISION_PROMPT },
+          { type: "text", text: prompt },
           { type: "image_url", image_url: { url: `data:${mime};base64,${image.toString("base64")}` } }
         ]
       }

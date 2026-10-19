@@ -33,3 +33,12 @@ export const parseExpenseBody = (body: unknown): ParsedExpense => {
 
   return { ok: true, amount, category, notes: notes || null };
 };
+
+/**
+ * Post-login redirect target. Only same-site absolute paths: "//evil.com" and
+ * "/\\evil.com" are protocol-relative to a browser, so both are refused.
+ */
+export function safeNext(value: unknown): string {
+  const v = typeof value === "string" ? value : "";
+  return /^\/(?![/\\])/.test(v) ? v : "/";
+}

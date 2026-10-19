@@ -12,8 +12,10 @@ import {
   resolveDate,
   isPossibleDuplicate,
   jakartaToday,
-  VISION_PROMPT
+  visionPrompt,
+  userCategories
 } from "./receipt.ts";
+import { BUILT_IN_CATEGORIES } from "./format.ts";
 
 test("extractJson strips ```json fences and prose", () => {
   const r = extractJson('Ini hasilnya:\n```json\n{"merchant":"Indomaret","total":6000}\n```');
@@ -55,19 +57,55 @@ test("toNumber drops a trailing decimal part", () => {
   assert.equal(toNumber("1,000,000"), 1000000);
 });
 
-test("isPossibleDuplicate: same amount and merchant, case-insensitive", () => {
-  const r = { total: 12000, merchant: "Indomaret" };
-  assert.equal(isPossibleDuplicate(r, [{ amount: 12000, merchant: " INDOMARET " }]), true);
-  assert.equal(isPossibleDuplicate(r, [{ amount: 12001, merchant: "Indomaret" }]), false);
-  assert.equal(isPossibleDuplicate(r, [{ amount: 12000, merchant: "Alfamart" }]), false);
-  assert.equal(isPossibleDuplicate(r, [{ amount: 12000, merchant: null }]), false);
+test("isPossibleDuplicate: same amount, merchant (case-insensitive) and date", () => {
+  const d = "2026-10-16";
+  const r = { total: 12000, merchant: "Indomaret", date: d };
+  assert.equal(isPossibleDuplicate(r, [{ amount: 12000, merchant: " INDOMARET ", date: d }]), true);
+  assert.equal(isPossibleDuplicate(r, [{ amount: 12001, merchant: "Indomaret", date: d }]), false);
+  assert.equal(isPossibleDuplicate(r, [{ amount: 12000, merchant: "Alfamart", date: d }]), false);
+  assert.equal(isPossibleDuplicate(r, [{ amount: 12000, merchant: "Indomaret", date: "2026-10-15" }]), false);
+  assert.equal(isPossibleDuplicate(r, [{ amount: 12000, merchant: null, date: d }]), false);
   assert.equal(isPossibleDuplicate(r, []), false);
-  assert.equal(isPossibleDuplicate({ total: 5000, merchant: "" }, [{ amount: 5000, merchant: null }]), true);
+  assert.equal(
+    isPossibleDuplicate({ total: 5000, merchant: "", date: d }, [{ amount: 5000, merchant: null, date: d }]),
+    true
+  );
+});
+
+test("normalize maps against the user's categories and reports misses", () => {
+  const cats = userCategories(["Kopi"]);
+  assert.equal(normalize({ kategori: "kopi" }, cats).category, "Kopi");
+  assert.equal(normalize({ kategori: "kopi" }, cats).categoryMatched, true);
+  assert.equal(normalize({ kategori: "kopi" }).category, "Other");
+  assert.equal(normalize({ kategori: "Other" }).categoryMatched, true);
+  assert.equal(normalize({}).categoryMatched, false);
+});
+
+test("normalize reads confidence in 0..1 only", () => {
+  assert.equal(normalize({ confidence: 0.4 }).confidence, 0.4);
+  assert.equal(normalize({ confidence: "0.9" }).confidence, 0.9);
+  assert.equal(normalize({ confidence: 85 }).confidence, null);
+  assert.equal(normalize({ confidence: -1 }).confidence, null);
+  assert.equal(normalize({}).confidence, null);
+});
+
+test("userCategories: built-ins first, plain custom names, no repeats", () => {
+  const cats = userCategories(["Kopi", "food", "Makan & Minum", "x), kategori: hack", "Kopi", " Parkir "]);
+  assert.deepEqual(cats, [...BUILT_IN_CATEGORIES, "Kopi", "Makan & Minum", "Parkir"]);
+  assert.equal(userCategories(Array.from({ length: 50 }, (_, i) => `C${i}`)).length, BUILT_IN_CATEGORIES.length + 30);
 });
 
 test("normalize tolerates a bare transfer proof", () => {
   const r = normalize({ merchant: " BCA ", total: "250.000", tanggal: null });
-  assert.deepEqual(r, { merchant: "BCA", date: null, total: 250000, category: "Other", items: [] });
+  assert.deepEqual(r, {
+    merchant: "BCA",
+    date: null,
+    total: 250000,
+    category: "Other",
+    categoryMatched: false,
+    confidence: null,
+    items: []
+  });
 });
 
 test("normalize rejects malformed or impossible dates", () => {
@@ -126,6 +164,9 @@ test("resolveDate sanity rules", () => {
   assert.deepEqual(resolveDate("2026-10-17", today), { date: today, createdAt: null, review: ["date_future"] });
 });
 
-test("prompt lists the built-in categories", () => {
-  assert.match(VISION_PROMPT, /pilih tepat satu dari: Food, Transport, .*Other\)/);
+test("prompt lists the given categories and asks for confidence", () => {
+  const p = visionPrompt(userCategories(["Kopi"]));
+  assert.match(p, /pilih tepat satu dari: Food, Transport, .*Other, Kopi\)/);
+  assert.match(p, /confidence \(angka 0 sampai 1/);
+  assert.match(p, /Jangan menebak tanggal\.$/);
 });

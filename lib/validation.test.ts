@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseExpenseBody } from "./validation.ts";
+import { parseExpenseBody, safeNext } from "./validation.ts";
 
 const valid = { amount: 50000, category: "Food", notes: "Lunch" };
 
@@ -106,4 +106,12 @@ test("accepts notes at exactly 1000 chars", () => {
 test("rejects null body without throwing", () => {
   const r = parseExpenseBody(null);
   assert.equal(r.ok, false);
+});
+
+test("safeNext keeps same-site paths and refuses everything else", () => {
+  assert.equal(safeNext("/connect"), "/connect");
+  assert.equal(safeNext("/devices?x=1"), "/devices?x=1");
+  for (const bad of ["//evil.com", "/\\evil.com", "https://evil.com", "connect", "", null, undefined, 42]) {
+    assert.equal(safeNext(bad), "/", String(bad));
+  }
 });
