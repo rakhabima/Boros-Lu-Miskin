@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { signIn, signUp, type AuthState } from "@/actions/auth";
 import { APP_LOGO, APP_NAME } from "@/lib/branding";
 
-export function AuthCard() {
+export function AuthCard({ next = "/" }: { next?: string }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const action = mode === "signup" ? signUp : signIn;
   const [state, formAction, pending] = useActionState<AuthState, FormData>(
@@ -50,6 +50,7 @@ export function AuthCard() {
         </div>
 
         <form action={formAction} className="grid gap-2">
+          <input type="hidden" name="next" value={next} />
           {mode === "signup" && (
             <input
               type="text"
@@ -93,7 +94,7 @@ export function AuthCard() {
         </div>
 
         <a
-          href="/api/auth/google"
+          href={next === "/" ? "/api/auth/google" : `/api/auth/google?next=${encodeURIComponent(next)}`}
           className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-neutral-300 bg-white px-4 text-sm font-medium text-neutral-900 transition hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-neutral-900/20"
           aria-label="Continue with Google"
         >

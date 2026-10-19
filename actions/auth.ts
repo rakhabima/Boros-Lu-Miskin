@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 import { pool } from "@/lib/db";
 import { createSession, destroySession } from "@/lib/session";
+import { safeNext } from "@/lib/validation";
 import { checkAuthRateLimit, pruneRateLimits } from "@/lib/rateLimit";
 
 export type AuthState = { error?: string };
@@ -47,7 +48,7 @@ export async function signUp(
       [hash, name, existing.rows[0].id]
     );
     await createSession(updated.rows[0].id);
-    redirect("/");
+    redirect(safeNext(formData.get("next")));
   }
 
   const hash = await bcrypt.hash(password, 12);
@@ -57,7 +58,7 @@ export async function signUp(
     [email, name, hash]
   );
   await createSession(created.rows[0].id);
-  redirect("/");
+  redirect(safeNext(formData.get("next")));
 }
 
 export async function signIn(
@@ -90,7 +91,7 @@ export async function signIn(
   }
 
   await createSession(result.rows[0].id);
-  redirect("/");
+  redirect(safeNext(formData.get("next")));
 }
 
 export async function signOut(): Promise<void> {

@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 import { config } from "@/lib/config";
 import { pool } from "@/lib/db";
 import { createSession } from "@/lib/session";
+import { safeNext } from "@/lib/validation";
 
 const USER_COLUMNS = "id, google_id, email, name, avatar_url";
 
@@ -14,6 +15,8 @@ export async function GET(req: NextRequest) {
   const jar = await cookies();
   const expected = jar.get("oauth_state")?.value;
   jar.delete("oauth_state");
+  const next = safeNext(jar.get("oauth_next")?.value);
+  jar.delete("oauth_next");
 
   if (!code || !state || !expected || state !== expected) {
     redirect("/login?error=oauth");
@@ -89,5 +92,5 @@ export async function GET(req: NextRequest) {
   }
 
   await createSession(userId!);
-  redirect("/");
+  redirect(next);
 }
