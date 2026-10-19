@@ -226,7 +226,8 @@ test("mirror: user A's expense goes only to A's spreadsheet", async () => {
   assert.equal(added[0].sheet, "sheet-anna");
   assert.equal(added[0].access, "at-anna");
   assert.match(added[0].query, /valueInputOption=USER_ENTERED/);
-  const [date, merchant, amount, category] = added[0].values[0];
+  const [recordedAt, date, merchant, category, amount] = added[0].values[0];
+  assert.match(recordedAt, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
   assert.match(date, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(merchant, "'=Toko Anna");
   assert.equal(amount, 12500);
