@@ -167,7 +167,7 @@ test("step 2 is not available before step 1, on iPhone or laptop", async () => {
     assert.match(html, /Selesaikan langkah 1 dulu/);
     assert.ok(!html.includes("/api/connect/approve"), "approve form must not render");
     assert.ok(!html.includes(INSTALL), "install link must not render");
-    assert.ok(!html.includes("<svg"), "QR must not render");
+    assert.ok(!html.includes("Kode QR"), "QR must not render");
   }
 });
 
@@ -295,5 +295,29 @@ test("/privacy is public: 200 with no session and for a gated, not-onboarded use
     assert.match(html, /Terakhir diperbarui/);
     assert.match(html, /alamat email kontak belum diatur/, "placeholder when PRIVACY_CONTACT_EMAIL is empty");
     assert.ok(!html.includes("mailto:"));
+  }
+});
+
+test("a gated, not-onboarded user can log out from /connect (laptop and iPhone) and is sent to login", async () => {
+  for (const ua of [LAPTOP, IPHONE]) {
+    const { sid } = await newUser("wrong-account");
+    const html = await (await get("/connect", sid, ua)).text();
+    assert.match(html, /Keluar/);
+    const action = html.match(/name="(\$ACTION_ID_[0-9a-f]+)"/)?.[1];
+    assert.ok(action, "logout form on /connect");
+    const form = new FormData(); // a no-JS form post is multipart
+    form.append(action, "");
+    const res = await fetch(`${BASE}/connect`, {
+      method: "POST",
+      redirect: "manual",
+      headers: { cookie: `sid=${sid}`, origin: BASE, "user-agent": ua },
+      body: form
+    });
+    assert.ok([303, 307].includes(res.status), String(res.status));
+    assert.equal(new URL(res.headers.get("location"), BASE).pathname, "/login");
+    assert.equal((await app.db.query(`SELECT 1 FROM user_sessions WHERE sid = $1`, [sid])).rowCount, 0);
+    const after = await get("/connect", sid, ua);
+    assert.equal(after.status, 307);
+    assert.equal(after.headers.get("location"), "/login?next=/connect");
   }
 });

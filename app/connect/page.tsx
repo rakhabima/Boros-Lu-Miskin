@@ -2,6 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { config } from "@/lib/config";
+import { signOut } from "@/actions/auth";
 import { getSession } from "@/lib/session";
 import { syncOnboarding } from "@/lib/onboarding";
 import { connectUrl, isIphone } from "@/lib/onboardingCore";
@@ -51,14 +52,58 @@ export default async function ConnectPage({
   return (
     <div className="min-h-screen flex items-center py-8">
       <div className="max-w-md mx-auto px-4 w-full grid gap-4">
-        <header>
+        <header className="grid gap-3">
           <h1 className="text-xl font-semibold">
             {APP_LOGO} {APP_NAME}
           </h1>
-          <p className="text-sm text-neutral-600">
-            Masuk sebagai {user.name}.{" "}
-            {allDone ? "Semua langkah selesai." : `Langkah ${st.sheets ? 2 : 1} dari 2`}
-          </p>
+
+          <div className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white p-3 shadow-sm">
+            {user.avatar_url ? (
+              // Google profile photo: a plain <img>, it is not worth next/image config.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.avatar_url}
+                alt=""
+                referrerPolicy="no-referrer"
+                className="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-neutral-100"
+              />
+            ) : (
+              <span
+                aria-hidden="true"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-base font-semibold text-white"
+              >
+                {user.name.trim().charAt(0).toUpperCase() || "?"}
+              </span>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-neutral-500">Masuk sebagai</p>
+              <p className="truncate text-sm font-semibold text-neutral-900">{user.name}</p>
+              {user.email && <p className="truncate text-xs text-neutral-500">{user.email}</p>}
+            </div>
+            <form action={signOut}>
+              <button
+                type="submit"
+                className="inline-flex h-9 items-center gap-1.5 rounded-full border border-neutral-300 bg-white px-3.5 text-sm font-medium text-neutral-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <path d="M16 17l5-5-5-5" />
+                  <path d="M21 12H9" />
+                </svg>
+                Keluar
+              </button>
+            </form>
+          </div>
+
+          <div className="grid gap-1.5" aria-label="Kemajuan">
+            <div className="grid grid-cols-2 gap-1.5">
+              <span className={`h-1.5 rounded-full ${st.sheets ? "bg-emerald-500" : "bg-neutral-900"}`} />
+              <span className={`h-1.5 rounded-full ${st.iphone ? "bg-emerald-500" : st.sheets ? "bg-neutral-900" : "bg-neutral-200"}`} />
+            </div>
+            <p className="text-xs text-neutral-500">
+              {allDone ? "Semua langkah selesai." : `Langkah ${st.sheets ? 2 : 1} dari 2`}
+            </p>
+          </div>
         </header>
 
         {allDone && (
