@@ -37,6 +37,34 @@ screen still in Testing, only listed test users can finish step 1, so new
 sign-ups would be locked out. With no install URL the gate refuses to turn on
 (the server logs a warning at startup).
 
+## Google login (the only way in)
+
+There is one button, "Lanjutkan dengan Google" (`/api/auth/google`), for
+sign-in and sign-up. Password login was removed (`users.password_hash` is kept
+but unused). Every login asks for `profile email` plus `drive.file`, with
+`access_type=offline` and `prompt=select_account`. It does not force
+`prompt=consent` and does not use `include_granted_scopes`, so Google decides
+when to show the consent screen. `?intent=signup` (old links) is accepted and
+behaves the same.
+
+The callback matches the Google account to an existing user by Google id, or by
+verified email (case-insensitive), and links the id: no duplicate accounts.
+
+Only when the token response has a refresh token AND `drive.file` was granted,
+`finishConnect()` (the same code as the /devices flow) creates the
+spreadsheet, stores the encrypted refresh token and turns mirroring on:
+
+- new account: always;
+- existing account: only if it has no `active` connection (Google usually
+  returns no refresh token on later logins, so nothing happens); an active
+  one is never overwritten;
+- Drive unticked, no refresh token, Sheets not configured, or any Google
+  error: login still succeeds and nothing is stored (the error is logged
+  without tokens). Step 1 on `/connect` stays open and offers the button again.
+
+A new account lands on `/connect`. The callback never completes onboarding;
+`syncOnboarding()` does, once both steps are really done.
+
 ## Google Cloud setup (once)
 
 Use the same Google Cloud project and OAuth client as login.

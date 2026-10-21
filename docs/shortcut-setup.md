@@ -8,6 +8,10 @@ see `SHORTCUT_NAME` in `lib/branding.ts`). It has two modes:
 - **Run with no input** (Back Tap): screenshots the screen and records it as
   an expense.
 
+Sign-in is Google only ("Lanjutkan dengan Google"). On the iPhone, log in with
+the same Google account you use on the laptop; the existing account is matched
+by Google id or verified email, never duplicated.
+
 Replace `https://APP` with your app origin, e.g. `https://<app>.vercel.app`.
 Production must be HTTPS; plain `http://` is refused there.
 

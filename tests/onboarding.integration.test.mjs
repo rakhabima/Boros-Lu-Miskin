@@ -285,3 +285,15 @@ test("a logged-out visitor on /connect is sent to login and brought back", async
   assert.equal(res.status, 307);
   assert.equal(res.headers.get("location"), "/login?next=/connect");
 });
+
+test("/privacy is public: 200 with no session and for a gated, not-onboarded user", async () => {
+  for (const sid of [null, (await newUser("privacy-gated")).sid]) {
+    const res = await get("/privacy", sid);
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.match(html, /Kebijakan Privasi/);
+    assert.match(html, /Terakhir diperbarui/);
+    assert.match(html, /alamat email kontak belum diatur/, "placeholder when PRIVACY_CONTACT_EMAIL is empty");
+    assert.ok(!html.includes("mailto:"));
+  }
+});
