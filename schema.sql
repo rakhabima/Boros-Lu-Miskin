@@ -165,3 +165,17 @@ CREATE TABLE IF NOT EXISTS sheets_connections (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Onboarding gate. Existing users are marked onboarded once, when the column
+-- is first created (see migrations/2026-10-onboarding-gate.sql).
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND table_name = 'users' AND column_name = 'onboarding_completed_at'
+  ) THEN
+    ALTER TABLE users ADD COLUMN onboarding_completed_at TIMESTAMPTZ;
+    UPDATE users SET onboarding_completed_at = NOW();
+  END IF;
+END $$;

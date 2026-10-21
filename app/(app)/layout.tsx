@@ -1,3 +1,6 @@
+import { redirect } from "next/navigation";
+import { config } from "@/lib/config";
+import { gateApplies } from "@/lib/onboardingCore";
 import { requireUser } from "@/lib/session";
 import { signOut } from "@/actions/auth";
 import { APP_LOGO, APP_NAME } from "@/lib/branding";
@@ -9,6 +12,9 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const user = await requireUser();
+  // Only the dashboard pages live in this group; /connect, /login and every
+  // /api route sit outside it, so they can never be gated.
+  if (gateApplies(config.onboarding.gateEnabled, user.onboarding_completed_at)) redirect("/connect");
 
   return (
     <div className="min-h-screen">

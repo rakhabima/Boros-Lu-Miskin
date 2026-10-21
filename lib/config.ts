@@ -1,3 +1,5 @@
+import { gateEnabledFrom } from "./onboardingCore";
+
 const required = [
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
@@ -16,6 +18,13 @@ const missing = process.env.DATABASE_URL
 
 if (missing.length > 0) {
   throw new Error(`Missing required env vars: ${missing.join(", ")}`);
+}
+
+const shortcutInstallUrl = process.env.SHORTCUT_INSTALL_URL || "";
+const gateRequested = process.env.ONBOARDING_GATE_ENABLED === "true";
+// A gate with no Shortcut to install would lock every new user out for good.
+if (gateRequested && !shortcutInstallUrl) {
+  console.warn("[onboarding] ONBOARDING_GATE_ENABLED=true but SHORTCUT_INSTALL_URL is empty: gate stays OFF");
 }
 
 export const config = {
@@ -63,7 +72,10 @@ export const config = {
     googleMockUrl:
       process.env.NODE_ENV === "production" ? "" : process.env.GOOGLE_API_MOCK_URL || ""
   },
-  shortcutInstallUrl: process.env.SHORTCUT_INSTALL_URL || "",
+  shortcutInstallUrl,
+  onboarding: { gateEnabled: gateEnabledFrom(process.env.ONBOARDING_GATE_ENABLED, shortcutInstallUrl) },
+  // Public origin for the /connect QR code; falls back to the request origin.
+  appBaseUrl: (process.env.APP_BASE_URL || "").replace(/\/+$/, ""),
   session: {
     secret: process.env.SESSION_SECRET as string,
     isProd: process.env.NODE_ENV === "production",

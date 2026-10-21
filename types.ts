@@ -4,6 +4,7 @@ export type User = {
   email: string | null;
   name: string;
   avatar_url: string | null;
+  onboarding_completed_at: string | null;
 };
 
 export type Expense = {

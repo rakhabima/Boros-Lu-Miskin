@@ -19,7 +19,8 @@ export const getSession = cache(async (): Promise<User | null> => {
   if (!sid) return null;
 
   const { rows } = await pool.query(
-    `SELECT u.id, u.google_id, u.email, u.name, u.avatar_url
+    `SELECT u.id, u.google_id, u.email, u.name, u.avatar_url,
+            u.onboarding_completed_at
      FROM user_sessions s
      JOIN users u ON u.id = (s.sess->>'userId')::int
      WHERE s.sid = $1 AND s.expire > NOW()`,
