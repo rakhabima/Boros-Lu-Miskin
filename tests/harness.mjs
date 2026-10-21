@@ -84,6 +84,9 @@ export function setupApp(env = () => ({})) {
       SHEETS_OAUTH_REDIRECT_URI: "",
       SHEETS_TOKEN_ENC_KEY: "",
       GOOGLE_API_MOCK_URL: "",
+      ONBOARDING_GATE_ENABLED: "",
+      SHORTCUT_INSTALL_URL: "",
+      APP_BASE_URL: "",
       ...env()
     };
     delete fullEnv.DATABASE_URL;

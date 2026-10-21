@@ -47,6 +47,26 @@ Tap each variable and pick the step named in the table; "Magic Variables"
 that silently point at the previous action are the usual cause of a broken
 Shortcut.
 
+## Onboarding gate
+
+When `ONBOARDING_GATE_ENABLED=true`, a new account cannot reach the dashboard
+until `/connect` shows both steps done: **1. Google Sheets** connected, **2.
+iPhone** connected (at least one non-revoked device with scope
+`receipts:create`). Existing accounts were marked onboarded by
+`migrations/2026-10-onboarding-gate.sql`, and revoking a device later never
+locks anyone out again. There is no skip button.
+
+On the iPhone, `/connect` shows **Pasang Shortcut** (the `SHORTCUT_INSTALL_URL`
+link) and **Hubungkan iPhone**. On a laptop it shows a QR code and link for
+`APP_BASE_URL/connect` (the request origin if unset) and waits for the iPhone,
+polling `GET /api/onboarding/status` every 3 s.
+
+**Keep `ONBOARDING_GATE_ENABLED` off in production until the Google consent
+screen is published and `SHORTCUT_INSTALL_URL` is set.** With the consent
+screen still in Testing, only listed test users can finish step 1, so new
+sign-ups would be locked out. With no install URL the gate refuses to turn on
+(the server logs a warning at startup).
+
 ## Connect (once per iPhone)
 
 1. Run the Shortcut once. With no token it opens `https://APP/connect` in Safari.

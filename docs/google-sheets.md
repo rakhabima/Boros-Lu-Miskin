@@ -20,6 +20,23 @@ before this layout keep their old header. Written with
 `USER_ENTERED`, so timestamps, dates and amounts are real date-times and numbers; text that
 starts with `= + - @` is prefixed with `'` so it can never run as a formula.
 
+## Onboarding
+
+Connecting Sheets is step 1 of the mandatory onboarding gate (see
+`docs/shortcut-setup.md`). `/connect` starts the grant with
+`/api/sheets/connect?return=/connect`; the callback sends the user back to
+`/connect?sheets=<flag>`. Only `/connect` and `/devices` are accepted as return
+paths (anything else lands on `/devices`), and the choice is carried inside the
+signed `state`. Denied consent, an unticked Drive box (`scope_denied`) and
+errors show a retry message there. Step 1 counts as done only while the
+connection is `active`. Disconnecting later does not re-lock an onboarded user.
+
+**Keep `ONBOARDING_GATE_ENABLED` off in production until the Google consent
+screen is published and `SHORTCUT_INSTALL_URL` is set.** With the consent
+screen still in Testing, only listed test users can finish step 1, so new
+sign-ups would be locked out. With no install URL the gate refuses to turn on
+(the server logs a warning at startup).
+
 ## Google Cloud setup (once)
 
 Use the same Google Cloud project and OAuth client as login.
