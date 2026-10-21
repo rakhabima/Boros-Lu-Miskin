@@ -73,6 +73,8 @@ export const config = {
       process.env.NODE_ENV === "production" ? "" : process.env.GOOGLE_API_MOCK_URL || ""
   },
   shortcutInstallUrl,
+  // Shown on /privacy as the account-deletion contact; empty shows a placeholder.
+  privacyContactEmail: process.env.PRIVACY_CONTACT_EMAIL || "",
   onboarding: { gateEnabled: gateEnabledFrom(process.env.ONBOARDING_GATE_ENABLED, shortcutInstallUrl) },
   // Public origin for the /connect QR code; falls back to the request origin.
   appBaseUrl: (process.env.APP_BASE_URL || "").replace(/\/+$/, ""),

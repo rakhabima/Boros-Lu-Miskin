@@ -148,6 +148,11 @@ export default async function ConnectPage({
             </section>
           </>
         )}
+        <p className="text-center text-xs text-neutral-500">
+          <Link href="/privacy" className="underline">
+            Kebijakan Privasi
+          </Link>
+        </p>
       </div>
     </div>
   );

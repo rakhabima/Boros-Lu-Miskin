@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { pool } from "@/lib/db";
 import { config } from "@/lib/config";
 import { requireUser } from "@/lib/session";
@@ -123,6 +124,11 @@ export default async function DevicesPage({
           </table>
         )}
       </section>
+      <p className="text-xs text-neutral-500">
+        <Link href="/privacy" className="underline">
+          Kebijakan Privasi
+        </Link>
+      </p>
     </div>
   );
 }
