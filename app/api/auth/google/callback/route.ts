@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 import { config } from "@/lib/config";
 import { pool } from "@/lib/db";
 import { createSession } from "@/lib/session";
+import { finishConnect, missingSheetsConfig, SHEETS_SCOPE } from "@/lib/sheets";
 import { safeNext } from "@/lib/validation";
 
 const USER_COLUMNS = "id, google_id, email, name, avatar_url";
@@ -22,7 +23,10 @@ export async function GET(req: NextRequest) {
     redirect("/login?error=oauth");
   }
 
-  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+  // Tests only: config ignores GOOGLE_API_MOCK_URL in production.
+  const mock = config.sheets.googleMockUrl;
+
+  const tokenRes = await fetch(mock ? `${mock}/token` : "https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -37,10 +41,11 @@ export async function GET(req: NextRequest) {
     console.error("[OAUTH] token exchange failed", tokenRes.status);
     redirect("/login?error=oauth");
   }
-  const { access_token } = await tokenRes.json();
+  const tokens = await tokenRes.json();
+  const { access_token } = tokens;
 
   const profileRes = await fetch(
-    "https://www.googleapis.com/oauth2/v2/userinfo",
+    mock ? `${mock}/oauth2/v2/userinfo` : "https://www.googleapis.com/oauth2/v2/userinfo",
     { headers: { Authorization: `Bearer ${access_token}` } }
   );
   if (!profileRes.ok) {
@@ -82,6 +87,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Branch 3: brand new user.
+  const isNew = !userId;
   if (!userId) {
     const created = await pool.query(
       `INSERT INTO users (google_id, email, name, avatar_url)
@@ -91,6 +97,37 @@ export async function GET(req: NextRequest) {
     userId = created.rows[0].id;
   }
 
+  if (tokens.refresh_token) await connectSheetsAtLogin(userId!, isNew, tokens);
+
   await createSession(userId!);
-  redirect(next);
+  // A new account goes to the onboarding page. Completion is decided there
+  // (syncOnboarding), never here.
+  redirect(isNew ? "/connect" : next);
+}
+
+/**
+ * New account, or an existing one with no active connection: finish the Sheets
+ * setup with the token we already hold. An active connection is never
+ * overwritten. Any failure is logged without secrets and swallowed: signing
+ * in must not depend on Google Sheets.
+ */
+async function connectSheetsAtLogin(
+  userId: number,
+  isNew: boolean,
+  tokens: { access_token: string; refresh_token?: string; scope?: string }
+) {
+  try {
+    if (!String(tokens.scope ?? "").split(" ").includes(SHEETS_SCOPE)) return;
+    if (missingSheetsConfig().length > 0) return;
+    if (!isNew) {
+      const { rows } = await pool.query(
+        `SELECT 1 FROM sheets_connections WHERE user_id = $1 AND status = 'active'`,
+        [userId]
+      );
+      if (rows.length > 0) return;
+    }
+    await finishConnect(userId, tokens);
+  } catch (err) {
+    console.error("[sheets] sign-up connect failed", err instanceof Error ? err.message : "error");
+  }
 }

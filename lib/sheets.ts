@@ -108,6 +108,18 @@ export async function connectFromCode(
     code,
     redirect_uri: config.sheets.redirectUri
   });
+  return finishConnect(userId, t);
+}
+
+/**
+ * Everything after the token exchange: scope check, spreadsheet, encrypted
+ * refresh token, mirroring on. Also used by Google sign-up, which already
+ * holds the token response (the code is single use).
+ */
+export async function finishConnect(
+  userId: number,
+  t: { access_token: string; refresh_token?: string; scope?: string }
+): Promise<"connected" | "no_refresh" | "scope_denied"> {
   if (!t.refresh_token) return "no_refresh";
   // Granular consent lets the user untick Drive and still "allow".
   if (!String(t.scope ?? "").split(" ").includes(SHEETS_SCOPE)) return "scope_denied";

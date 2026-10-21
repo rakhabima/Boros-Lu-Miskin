@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { NextRequest } from "next/server";
 import { config } from "@/lib/config";
+import { SHEETS_SCOPE } from "@/lib/sheets";
 import { safeNext } from "@/lib/validation";
 
 export async function GET(req: NextRequest) {
@@ -23,7 +24,13 @@ export async function GET(req: NextRequest) {
     client_id: config.auth.googleClientId,
     redirect_uri: `${config.origins.backend}/api/auth/google/callback`,
     response_type: "code",
-    scope: "profile email",
+    // One button for sign-in and sign-up, so every login asks for Sheets too.
+    // `?intent=signup` (old links) is ignored: both behave the same. Google
+    // decides when to show the consent screen (no prompt=consent), and
+    // include_granted_scopes is not used: it would fold other grants in.
+    scope: `profile email ${SHEETS_SCOPE}`,
+    access_type: "offline",
+    prompt: "select_account",
     state
   });
 
