@@ -18,7 +18,7 @@ export default async function AppLayout({
 
   return (
     <div className="min-h-screen">
-      <div className="max-w-5xl mx-auto px-6 py-10">
+      <div className="max-w-5xl mx-auto px-4 py-6 sm:px-6 sm:py-10">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-8">
           <div>
             <h1 className="text-2xl font-semibold flex items-center gap-2">
@@ -29,7 +29,7 @@ export default async function AppLayout({
             </h1>
             <p className="text-sm text-neutral-600">Signed in as {user.name}</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <NavLink href="/">Expenses</NavLink>
             <NavLink href="/insights">Get Insights with AI</NavLink>
             <NavLink href="/devices">Devices</NavLink>

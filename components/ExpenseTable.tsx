@@ -28,13 +28,13 @@ export function ExpenseTable({
   return (
     <>
       <div className="overflow-x-auto">
-        <table className="w-full border border-neutral-300 rounded bg-white">
+        <table className="w-full border border-neutral-300 rounded bg-white text-sm sm:text-base">
           <thead className="bg-neutral-100">
             <tr>
-              <th className="text-left px-3 py-2">Date</th>
-              <th className="text-left px-3 py-2">Category</th>
-              <th className="text-right px-3 py-2">Amount</th>
-              <th className="text-right px-3 py-2">Actions</th>
+              <th className="text-left px-2 py-2 sm:px-3">Date</th>
+              <th className="text-left px-2 py-2 sm:px-3">Category</th>
+              <th className="text-right px-2 py-2 sm:px-3">Amount</th>
+              <th className="text-right px-2 py-2 sm:px-3">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -44,10 +44,10 @@ export function ExpenseTable({
                 className="border-t border-neutral-200 cursor-pointer hover:bg-neutral-50"
                 onClick={() => onRowClick(e)}
               >
-                <td className="px-3 py-2">
+                <td className="px-2 py-2 sm:px-3 whitespace-nowrap">
                   {new Date(e.created_at).toLocaleDateString("id-ID")}
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-2 py-2 sm:px-3">
                   {e.category}
                   {e.needs_review && (
                     <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
@@ -55,10 +55,10 @@ export function ExpenseTable({
                     </span>
                   )}
                 </td>
-                <td className="px-3 py-2 text-right">
+                <td className="px-2 py-2 sm:px-3 text-right whitespace-nowrap">
                   {formatIDR(e.amount)}
                 </td>
-                <td className="px-3 py-2 text-right">
+                <td className="px-2 py-2 sm:px-3 text-right">
                   <button
                     type="button"
                     onClick={(event) => {

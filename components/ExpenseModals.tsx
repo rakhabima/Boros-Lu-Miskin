@@ -35,7 +35,7 @@ function DeleteConfirmModal({
       role="dialog"
       aria-modal="true"
     >
-      <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
+      <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-lg bg-white p-5 shadow-lg sm:p-6">
         <h2 className="text-lg font-semibold mb-2">Delete expense?</h2>
         <p className="text-sm text-neutral-600 mb-4">
           This will remove{" "}
@@ -98,7 +98,7 @@ function EditExpenseModal({
       role="dialog"
       aria-modal="true"
     >
-      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-lg bg-white p-5 shadow-lg sm:p-6">
         <h2 className="text-lg font-semibold mb-4">Edit expense</h2>
         <form action={formAction} className="grid gap-3">
           <input type="hidden" name="id" value={expense.id} />
@@ -106,7 +106,7 @@ function EditExpenseModal({
             type="number"
             name="amount"
             defaultValue={expense.amount}
-            className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm"
+            className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-base sm:text-sm"
             required
           />
           <CategorySelect
@@ -121,7 +121,7 @@ function EditExpenseModal({
             name="notes"
             defaultValue={expense.notes || ""}
             placeholder="Notes (optional)"
-            className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm"
+            className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-base sm:text-sm"
           />
           {state.error && (
             <div className="text-sm text-red-600">{state.error}</div>
@@ -194,7 +194,7 @@ export function ExpenseModals({
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+          <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-lg bg-white p-5 shadow-lg sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <h2 className="text-lg font-semibold">Expense details</h2>
               <button

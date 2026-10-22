@@ -28,7 +28,7 @@ export function AddExpenseForm() {
           type="number"
           name="amount"
           placeholder="Amount (IDR)"
-          className="md:col-span-2 h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm"
+          className="md:col-span-2 h-10 rounded-md border border-neutral-300 bg-white px-3 text-base sm:text-sm"
           required
         />
         <CategorySelect
@@ -43,7 +43,7 @@ export function AddExpenseForm() {
           type="text"
           name="notes"
           placeholder="Notes (optional)"
-          className="md:col-span-2 h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm"
+          className="md:col-span-2 h-10 rounded-md border border-neutral-300 bg-white px-3 text-base sm:text-sm"
         />
         <button
           disabled={pending}

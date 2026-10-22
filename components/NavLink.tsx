@@ -14,7 +14,7 @@ export function NavLink({
   return (
     <Link
       href={href}
-      className={`h-10 inline-flex items-center rounded-md border px-4 text-sm ${
+      className={`h-10 inline-flex items-center rounded-md border px-3 text-sm sm:px-4 ${
         active
           ? "border-neutral-900 bg-neutral-900 text-white"
           : "border-neutral-300"

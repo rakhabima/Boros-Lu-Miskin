@@ -88,7 +88,7 @@ export function SheetsSection({
           )}
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
             <dt className="text-neutral-500">Akun Google</dt>
-            <dd>{connection.google_email ?? "—"}</dd>
+            <dd className="break-all">{connection.google_email ?? "—"}</dd>
             <dt className="text-neutral-500">Spreadsheet</dt>
             <dd>
               <a href={connection.spreadsheet_url} target="_blank" rel="noreferrer" className="underline">

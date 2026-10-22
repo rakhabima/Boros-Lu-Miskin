@@ -52,7 +52,8 @@ export default async function DevicesPage({
         {devices.length === 0 ? (
           <p className="text-sm text-neutral-500">No devices yet.</p>
         ) : (
-          <table className="w-full text-sm rounded-lg border border-neutral-200 bg-white">
+          <div className="overflow-x-auto">
+<table className="min-w-max w-full text-sm rounded-lg border border-neutral-200 bg-white">
             <thead className="bg-neutral-50 text-neutral-600">
               <tr>
                 <th className="text-left px-3 py-2">Name</th>
@@ -83,6 +84,7 @@ export default async function DevicesPage({
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
 
@@ -98,7 +100,8 @@ export default async function DevicesPage({
         {failures.length === 0 ? (
           <p className="text-sm text-neutral-500">None.</p>
         ) : (
-          <table className="w-full text-sm rounded-lg border border-neutral-200 bg-white">
+          <div className="overflow-x-auto">
+<table className="min-w-max w-full text-sm rounded-lg border border-neutral-200 bg-white">
             <thead className="bg-neutral-50 text-neutral-600">
               <tr>
                 <th className="text-left px-3 py-2">When</th>
@@ -122,6 +125,7 @@ export default async function DevicesPage({
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
       <p className="text-xs text-neutral-500">

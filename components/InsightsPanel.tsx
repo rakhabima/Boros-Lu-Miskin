@@ -128,14 +128,14 @@ export function InsightsPanel() {
   }
 
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white p-6 flex flex-col gap-4">
+    <div className="rounded-lg border border-neutral-200 bg-white p-4 sm:p-6 flex flex-col gap-4">
       <div className="text-sm text-neutral-500">
         Ask for spending insights and tips.
       </div>
 
       <div
         ref={transcriptRef}
-        className="rounded-md border border-neutral-200 bg-neutral-50 p-4 text-sm space-y-3 max-h-[420px] overflow-y-auto"
+        className="rounded-md border border-neutral-200 bg-neutral-50 p-4 text-sm space-y-3 max-h-[60vh] sm:max-h-[420px] overflow-y-auto"
         aria-live="polite"
       >
         {messages.length === 0 && (
@@ -144,7 +144,7 @@ export function InsightsPanel() {
         {messages.map((msg, index) => (
           <div
             key={`${msg.role}-${index}`}
-            className={`max-w-[80%] rounded-md px-3 py-2 ${
+            className={`max-w-[90%] sm:max-w-[80%] rounded-md px-3 py-2 ${
               msg.role === "user"
                 ? "ml-auto bg-white border border-neutral-200"
                 : "bg-neutral-900 text-white"
@@ -186,7 +186,7 @@ export function InsightsPanel() {
             type="text"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            className="h-10 flex-1 rounded-md border border-neutral-300 bg-white px-3 text-sm disabled:opacity-60"
+            className="h-10 min-w-0 flex-1 rounded-md border border-neutral-300 bg-white px-3 text-base sm:text-sm disabled:opacity-60"
             placeholder="Type a message..."
             disabled={loading}
           />

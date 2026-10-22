@@ -143,7 +143,7 @@ export function ExportModal({
           role="dialog"
           aria-modal="true"
         >
-          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
+          <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-lg bg-white p-5 shadow-lg sm:p-6">
             <h2 className="text-lg font-semibold mb-2">Export expenses</h2>
             <p className="text-sm text-neutral-600 mb-4">
               Choose a format to download your filtered expenses.
