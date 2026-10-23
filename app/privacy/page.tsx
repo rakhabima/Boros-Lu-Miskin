@@ -24,7 +24,7 @@ export default function PrivacyPage() {
   const email = config.privacyContactEmail;
   return (
     <div className="min-h-screen py-8">
-      <article className="max-w-2xl mx-auto px-4 grid gap-6 text-sm leading-relaxed text-neutral-700">
+      <article className="max-w-2xl mx-auto px-4 grid grid-cols-[minmax(0,1fr)] gap-6 text-sm leading-relaxed text-neutral-700">
         <header className="grid gap-1">
           <h1 className="text-2xl font-semibold text-neutral-900">
             {APP_LOGO} Kebijakan Privasi

@@ -23,11 +23,11 @@ const FLASH: Record<string, { text: string; bad?: boolean }> = {
 const fmt = (d: string | null) =>
   d ? new Date(d).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) : "belum pernah";
 
-const button = "h-9 rounded-md border border-neutral-300 px-3 text-sm";
+const button = "h-9 rounded-full border border-neutral-300 px-4 text-sm font-medium";
 
 function Toggle({ on, label }: { on: boolean; label: string }) {
   return (
-    <form method="post" action="/api/sheets/toggle" className="flex items-center gap-3 text-sm">
+    <form method="post" action="/api/sheets/toggle" className="flex flex-wrap items-center gap-3 text-sm">
       <input type="hidden" name="enabled" value={on ? "off" : "on"} />
       <span>
         {label}: <strong>{on ? "aktif" : "mati"}</strong>
@@ -49,6 +49,11 @@ export function SheetsSection({
   flash?: string;
 }) {
   const note = flash ? FLASH[flash] : undefined;
+  const badge = !connection
+    ? { text: "Belum terhubung", cls: "bg-neutral-100 text-neutral-600" }
+    : connection.status === "active"
+      ? { text: "Aktif", cls: "bg-emerald-50 text-emerald-700" }
+      : { text: connection.status === "needs_reconnect" ? "Perlu dihubungkan ulang" : "Gagal menyalin", cls: "bg-amber-50 text-amber-800" };
   const connect = (label: string) => (
     <a href="/api/sheets/connect" className={`${button} inline-flex items-center bg-neutral-900 text-white`}>
       {label}
@@ -56,10 +61,13 @@ export function SheetsSection({
   );
 
   return (
-    <section className="grid gap-3">
-      <h2 className="text-lg font-semibold">Google Sheets</h2>
+    <section className="grid grid-cols-[minmax(0,1fr)] gap-4 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-base font-semibold">Google Sheets</h3>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge.cls}`}>{badge.text}</span>
+      </div>
       {note && (
-        <p role="status" className={`text-sm ${note.bad ? "text-red-600" : "text-green-700"}`}>
+        <p role="status" className={`rounded-lg p-3 text-sm ${note.bad ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-800"}`}>
           {note.text}
         </p>
       )}
@@ -86,7 +94,7 @@ export function SheetsSection({
               {connect("Hubungkan ulang")}
             </div>
           )}
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-xl bg-neutral-50 p-3 text-sm">
             <dt className="text-neutral-500">Akun Google</dt>
             <dd className="break-all">{connection.google_email ?? "—"}</dd>
             <dt className="text-neutral-500">Spreadsheet</dt>
