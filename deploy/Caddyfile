@@ -1,0 +1,17 @@
+# Option A: Caddy on the host. Gets and renews the HTTPS certificate by itself.
+# Add this block to /etc/caddy/Caddyfile, then: sudo systemctl reload caddy
+#
+# Caddy forwards Host, X-Forwarded-For and X-Forwarded-Proto by default, which
+# the app needs (CSRF origin check, HTTPS-only receipts, per-IP rate limits).
+
+boros.rakhbim-project.my.id {
+    encode zstd gzip
+    request_body {
+        max_size 5MB
+    }
+    reverse_proxy 127.0.0.1:3000 {
+        transport http {
+            read_timeout 90s
+        }
+    }
+}
