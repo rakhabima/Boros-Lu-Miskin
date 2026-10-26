@@ -13,7 +13,7 @@ export async function askInsights(
   const user = await requireUser();
 
   if (!config.ai.apiKey) {
-    return { error: "AI is not configured on the server" };
+    return { error: "AI belum disetel di server." };
   }
 
   const rate = await checkRateLimit(
@@ -22,10 +22,10 @@ export async function askInsights(
     AI_LIMIT.windowSec
   );
   if (!rate.allowed) {
-    return { error: "AI request limit reached for this hour." };
+    return { error: "Batas tanya AI jam ini udah penuh. Coba lagi nanti." };
   }
 
-  const userPrompt = prompt?.trim() || "Give me insights and tips.";
+  const userPrompt = prompt?.trim() || "Kasih gua insight dan tips.";
 
   const safeMessages = (Array.isArray(messages) ? messages : [])
     .filter((m) => m && typeof m.role === "string")
@@ -41,9 +41,9 @@ export async function askInsights(
   } catch (err) {
     // AbortSignal.timeout rejects with TimeoutError (approved fix 2).
     if (err instanceof Error && err.name === "TimeoutError") {
-      return { error: "AI request timed out. Try again." };
+      return { error: "AI kelamaan jawab. Coba lagi ya." };
     }
     console.error("[AI] request failed", err);
-    return { error: "AI request failed" };
+    return { error: "Permintaan ke AI gagal. Coba lagi ya." };
   }
 }

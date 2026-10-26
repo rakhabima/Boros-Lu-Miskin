@@ -27,11 +27,11 @@ export default async function AppLayout({
               </span>
               {APP_NAME}
             </h1>
-            <p className="text-sm text-neutral-600">Signed in as {user.name}</p>
+            <p className="text-sm text-neutral-600">Masuk sebagai {user.name}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <NavLink href="/">Expenses</NavLink>
-            <NavLink href="/insights">Get Insights with AI</NavLink>
+            <NavLink href="/">Pengeluaran</NavLink>
+            <NavLink href="/insights">Tanya AI</NavLink>
             <NavLink href="/devices">Devices</NavLink>
             <form action={signOut}>
               <button

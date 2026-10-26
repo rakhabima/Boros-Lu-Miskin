@@ -67,23 +67,23 @@ const json = (http: number, body: Body) =>
   );
 
 export async function POST(req: Request) {
-  if (isInsecure(req)) return json(403, { ok: false, message: "HTTPS wajib." });
+  if (isInsecure(req)) return json(403, { ok: false, message: "Harus pake HTTPS." });
   try {
     const ip = await clientIp();
     const byIp = await checkRateLimit(`rcpt:ip:${ip}`, RECEIPT_IP_LIMIT.limit, RECEIPT_IP_LIMIT.windowSec);
     if (!byIp.allowed) {
-      return json(429, { ok: false, message: "Terlalu banyak kiriman. Coba lagi nanti." });
+      return json(429, { ok: false, message: "Kebanyakan kiriman. Coba lagi nanti ya." });
     }
 
     const device = await deviceFromBearer(req.headers.get("authorization"), RECEIPT_SCOPE);
     if (!device) {
-      return json(401, { ok: false, message: "Perangkat belum terhubung atau sudah dicabut." });
+      return json(401, { ok: false, message: "iPhone belum connect atau udah disconnect." });
     }
 
     const started = Date.now();
     const outcome = await handle(req, device).catch((err): Outcome => {
       console.error("[receipt] unexpected", err instanceof Error ? err.message : err);
-      return fail(500, "failed", "server_error", "Terjadi kesalahan server. Coba lagi.");
+      return fail(500, "failed", "server_error", "Server lagi error. Coba lagi ya.");
     });
 
     // Privacy: only model, status, duration and error code are recorded.
@@ -98,7 +98,7 @@ export async function POST(req: Request) {
     return json(outcome.http, outcome.body);
   } catch (err) {
     console.error("[receipt] unexpected", err instanceof Error ? err.message : err);
-    return json(500, { ok: false, message: "Terjadi kesalahan server. Coba lagi." });
+    return json(500, { ok: false, message: "Server lagi error. Coba lagi ya." });
   }
 }
 
@@ -108,7 +108,7 @@ async function handle(req: Request, device: { id: number; user_id: number }): Pr
   // Per user, not per device: a second phone must not double the allowance.
   const byUser = await checkRateLimit(`rcpt:u:${userId}`, config.vision.hourlyLimit, 60 * 60);
   if (!byUser.allowed) {
-    return fail(429, "rate_limited", "user_rate_limit", "Terlalu banyak kiriman. Coba lagi nanti.");
+    return fail(429, "rate_limited", "user_rate_limit", "Kebanyakan kiriman. Coba lagi nanti ya.");
   }
 
   // --- Input ---
@@ -119,7 +119,7 @@ async function handle(req: Request, device: { id: number; user_id: number }): Pr
   if (image === "too_large") return fail(413, "rejected", "image_too_large", "Gambar terlalu besar.");
   if (!image) return fail(400, "rejected", "bad_request", "Format kiriman salah.");
   const mime = imageType(image);
-  if (!mime) return fail(415, "rejected", "bad_image_type", "Gambar harus JPEG atau PNG.");
+  if (!mime) return fail(415, "rejected", "bad_image_type", "Gambarnya harus JPEG atau PNG.");
 
   // --- Duplicate: checked before the model so a resend costs nothing ---
   const key = dedupeKey(image);
@@ -134,7 +134,7 @@ async function handle(req: Request, device: { id: number; user_id: number }): Pr
     [userId]
   );
   if (usage.rows[0].count > config.vision.dailyCap) {
-    return fail(429, "rate_limited", "daily_cap", "Batas harian struk tercapai. Coba lagi besok.");
+    return fail(429, "rate_limited", "daily_cap", "Batas struk hari ini udah penuh. Coba lagi besok.");
   }
 
   // --- Read: the model picks from this user's categories (built-ins first) ---
@@ -149,15 +149,15 @@ async function handle(req: Request, device: { id: number; user_id: number }): Pr
   } catch (err) {
     const code = err instanceof VisionError ? err.code : "vision_error";
     return code === "timeout"
-      ? fail(504, "failed", code, "Waktu habis saat membaca struk. Coba lagi.")
-      : fail(502, "failed", code, "Gagal membaca struk. Coba lagi.");
+      ? fail(504, "failed", code, "Kelamaan baca struknya. Coba lagi ya.")
+      : fail(502, "failed", code, "Gagal baca struk. Coba lagi ya.");
   }
 
   let receipt;
   try {
     receipt = normalize(extractJson(text), categories);
   } catch {
-    return fail(502, "failed", "parse_failed", "Struk tidak terbaca. Coba foto yang lebih jelas.");
+    return fail(502, "failed", "parse_failed", "Struk nggak kebaca. Coba foto yang lebih jelas.");
   }
 
   const when = resolveDate(receipt.date, jakartaToday());
@@ -179,7 +179,7 @@ async function handle(req: Request, device: { id: number; user_id: number }): Pr
       status: "failed",
       error_code: "no_total",
       http: 422,
-      body: { ok: false, message: "Total tidak terbaca. Catat manual ya.", ...result, needs_review: true }
+      body: { ok: false, message: "Totalnya nggak kebaca. Catat manual ya.", ...result, needs_review: true }
     };
   }
 
@@ -189,7 +189,7 @@ async function handle(req: Request, device: { id: number; user_id: number }): Pr
     category: receipt.category,
     notes: buildNotes(receipt)
   });
-  if (!parsed.ok) return fail(422, "failed", `invalid_${parsed.field}`, "Data struk tidak valid. Catat manual ya.");
+  if (!parsed.ok) return fail(422, "failed", `invalid_${parsed.field}`, "Data struknya nggak valid. Catat manual ya.");
 
   const recent = await pool.query(
     `SELECT amount, extraction->>'merchant' AS merchant, to_char(created_at, 'YYYY-MM-DD') AS date
@@ -247,7 +247,7 @@ async function handle(req: Request, device: { id: number; user_id: number }): Pr
     body: {
       ok: true,
       message: similar
-        ? `Tersimpan, tapi mirip struk yang baru saja disimpan: ${label}. Cek dan hapus jika dobel.`
+        ? `Tersimpan, tapi mirip struk yang baru saja disimpan: ${label}. Cek dan hapus kalo dobel.`
         : needsReview
           ? `Tersimpan, perlu dicek: ${label}`
           : `Tersimpan: ${label} (${receipt.category})`,
@@ -270,7 +270,7 @@ async function findDuplicate(userId: number, key: string): Promise<Outcome | nul
     http: 200,
     body: {
       ok: true,
-      message: "Struk ini sudah pernah disimpan.",
+      message: "Struk ini udah pernah kesimpen.",
       merchant: rows[0].merchant || null,
       total: rows[0].amount,
       category: rows[0].category,

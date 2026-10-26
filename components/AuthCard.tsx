@@ -39,9 +39,8 @@ export function AuthCard({ next = "/" }: { next?: string }) {
           Lanjutkan dengan Google
         </a>
         <p className="text-xs text-neutral-500">
-          Saat pertama kali masuk, Google akan meminta izin Google Drive. Izin ini hanya dipakai untuk
-          membuat spreadsheet milikmu untuk menyimpan struk. Aplikasi hanya bisa membuka file yang
-          dibuatnya sendiri, dan salinan ini bisa dimatikan nanti.{" "}
+          Pas pertama login, Google bakal minta izin Drive. Cuma dipakai buat bikin spreadsheet Lo
+          sendiri, file lain di Drive Lo nggak bisa dibuka.{" "}
           <Link href="/privacy" className="underline">
             Kebijakan Privasi
           </Link>

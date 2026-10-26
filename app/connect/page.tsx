@@ -10,14 +10,14 @@ import { qrSvg } from "@/lib/qr";
 import { APP_LOGO, APP_NAME, SHORTCUT_NAME } from "@/lib/branding";
 import { CopyLink, IphonePoller } from "@/components/ConnectClient";
 
-const RETRY_DRIVE = "Akses Google Drive diperlukan. Centang izin Drive di layar Google, lalu coba lagi.";
-const RETRY_GENERIC = "Gagal menghubungkan Google Sheets. Coba lagi.";
+const RETRY_DRIVE = "Akses Google Drive-nya perlu dikasih. Centang izin Drive di layar Google, terus coba lagi.";
+const RETRY_GENERIC = "Gagal nyambungin Google Sheets. Coba lagi ya.";
 const FLASH: Record<string, string> = {
   denied: RETRY_DRIVE,
   scope_denied: RETRY_DRIVE,
   no_refresh: RETRY_GENERIC,
   state_error: RETRY_GENERIC,
-  not_configured: "Google Sheets belum dikonfigurasi di server. Hubungi admin.",
+  not_configured: "Google Sheets belum disetel di server. Kabarin admin.",
   error: RETRY_GENERIC
 };
 
@@ -36,7 +36,7 @@ export default async function ConnectPage({
 
   const [{ sheets: flash }, h] = await Promise.all([searchParams, headers()]);
   const st = await syncOnboarding(user.id);
-  if (st.justCompleted) redirect("/");
+  if (st.justCompleted) redirect("/?tips=1");
 
   const iphone = isIphone(h.get("user-agent"));
   // Someone already onboarded may re-pair an iPhone without redoing step 1.
@@ -90,10 +90,14 @@ export default async function ConnectPage({
                   <path d="M16 17l5-5-5-5" />
                   <path d="M21 12H9" />
                 </svg>
-                Keluar
+                Log out
               </button>
             </form>
           </div>
+
+          <p className="text-sm text-neutral-600">
+            Ikutin dua langkah simple ini, abis itu Lo tinggal pake shortcutnya doang di iPhone Lo.
+          </p>
 
           <div className="grid gap-1.5" aria-label="Kemajuan">
             <div className="grid grid-cols-2 gap-1.5">
@@ -101,19 +105,22 @@ export default async function ConnectPage({
               <span className={`h-1.5 rounded-full ${st.iphone ? "bg-emerald-500" : st.sheets ? "bg-neutral-900" : "bg-neutral-200"}`} />
             </div>
             <p className="text-xs text-neutral-500">
-              {allDone ? "Semua langkah selesai." : `Langkah ${st.sheets ? 2 : 1} dari 2`}
+              {allDone ? "Semua langkah kelar." : `Langkah ${st.sheets ? 2 : 1} dari 2`}
             </p>
           </div>
         </header>
 
         {allDone && (
           <section className={`${card} grid gap-3`}>
-            <h2 className="font-semibold">Semua siap</h2>
+            <h2 className="font-semibold">Udah siap semua</h2>
             <p className="text-sm text-neutral-600">
-              Google Sheets dan iPhone sudah terhubung. Foto struk lewat Shortcut “{SHORTCUT_NAME}”
-              akan tercatat otomatis.
+              Google Sheets sama iPhone Lo udah nyambung. Mulai sekarang, tiap struk yang Lo foto lewat
+              Shortcut “{SHORTCUT_NAME}” kecatet otomatis.
             </p>
-            <Link href="/" className={primary}>
+            <p className="text-sm text-neutral-600">
+              Abis ini bakal ada panduan singkat buat nyalain triggernya.
+            </p>
+            <Link href="/?tips=1" className={primary}>
               Ke dashboard
             </Link>
           </section>
@@ -122,14 +129,13 @@ export default async function ConnectPage({
         {!allDone && (
           <>
             <section className={`${card} grid gap-3`}>
-              <h2 className="font-semibold">1. Google Sheets {st.sheets && "✓"}</h2>
+              <h2 className="font-semibold">1. Connect Google Sheets {st.sheets && "✓"}</h2>
               <p className="text-sm text-neutral-600">
-                Setiap struk disalin ke spreadsheet di Google Drive-mu sendiri. Aplikasi hanya bisa
-                membuka file yang dibuatnya sendiri, dan kamu bisa mematikan salinan ini nanti di
-                /devices.
+                Udah connect aja biar pengeluaran Lo otomatis kecatet di Sheets. Kalo nggak mau,
+                tinggal dimatiin nanti di halaman Devices.
               </p>
               {st.sheets ? (
-                <p className="text-sm">Terhubung sebagai {st.googleEmail ?? "akun Google"}.</p>
+                <p className="text-sm">Nyambung sebagai {st.googleEmail ?? "akun Google"}.</p>
               ) : (
                 <>
                   {flash && FLASH[flash] && (
@@ -138,50 +144,67 @@ export default async function ConnectPage({
                     </p>
                   )}
                   <a href="/api/sheets/connect?return=/connect" className={primary}>
-                    {reconnect ? "Hubungkan ulang" : "Hubungkan Google Sheets"}
+                    {reconnect ? "Connect ulang" : "Connect Google Sheets"}
                   </a>
                 </>
               )}
             </section>
 
             <section className={`${card} grid gap-3 ${locked ? "opacity-50" : ""}`}>
-              <h2 className="font-semibold">2. iPhone {st.iphone && "✓"}</h2>
+              <h2 className="font-semibold">
+                {locked || st.iphone ? "2. iPhone" : iphone ? "2. Connect iPhone Lo!" : "2. Lanjut dari iPhone Lo"}{" "}
+                {st.iphone && "✓"}
+              </h2>
               {locked ? (
-                <p className="text-sm text-neutral-600">Selesaikan langkah 1 dulu.</p>
+                <p className="text-sm text-neutral-600">Beresin langkah 1 dulu, baru iPhone Lo bisa di-connect.</p>
               ) : iphone ? (
                 <>
-                  <p className="text-sm text-neutral-600">A. Pasang Shortcut “{SHORTCUT_NAME}”.</p>
-                  {config.shortcutInstallUrl ? (
-                    <a
-                      href={config.shortcutInstallUrl}
-                      className="inline-flex h-11 w-full items-center justify-center rounded-md border border-neutral-300 text-sm font-medium"
-                    >
-                      Pasang Shortcut
-                    </a>
-                  ) : (
-                    <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
-                      Admin: SHORTCUT_INSTALL_URL belum diisi, jadi tautan Shortcut belum tersedia.
+                  <p className="text-sm text-neutral-600">
+                    Ikutin aja biar iPhone Lo nyambung ke website ini.
+                  </p>
+                  <div className="grid gap-2">
+                    <p className="text-sm font-medium">A. Pasang Shortcut</p>
+                    <p className="text-sm text-neutral-600">
+                      Wajib dipasang biar pengeluaran Lo kecatet otomatis. Ketuk Tambahkan Shortcut, terus
+                      balik ke sini.
                     </p>
-                  )}
-                  <p className="text-sm text-neutral-600">B. Hubungkan iPhone ini ke akunmu.</p>
-                  <form method="post" action="/api/connect/approve">
-                    <button className={primary}>Hubungkan iPhone</button>
-                  </form>
+                    {config.shortcutInstallUrl ? (
+                      <a
+                        href={config.shortcutInstallUrl}
+                        className="inline-flex h-11 w-full items-center justify-center rounded-md border border-neutral-300 text-sm font-medium"
+                      >
+                        Pasang Shortcut
+                      </a>
+                    ) : (
+                      <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+                        Admin: SHORTCUT_INSTALL_URL belum diisi, jadi link Shortcut-nya belum bisa dipake.
+                      </p>
+                    )}
+                  </div>
+                  <div className="grid gap-2">
+                    <p className="text-sm font-medium">B. Connect iPhone Lo</p>
+                    <p className="text-sm text-neutral-600">
+                      Shortcut kebuka bentar, muncul “Connected”. Abis itu balik ke sini, bos.
+                    </p>
+                    <form method="post" action="/api/connect/approve">
+                      <button className={primary}>Connect iPhone</button>
+                    </form>
+                  </div>
                   <a href="/connect" className="text-center text-sm text-neutral-500 underline">
-                    Sudah selesai? Periksa lagi
+                    Udah kelar? Cek lagi
                   </a>
                 </>
               ) : st.iphone ? (
-                <p className="text-sm">iPhone sudah terhubung.</p>
+                <p className="text-sm">iPhone Lo udah nyambung.</p>
               ) : (
                 <>
                   <p className="text-sm text-neutral-600">
-                    Buka di iPhone-mu, lalu masuk dengan akun yang sama.
+                    Scan QR ini pake kamera iPhone, terus login pake akun Google yang sama. Halaman ini bakal lanjut sendiri begitu iPhone Lo nyambung.
                   </p>
                   {qr && (
                     <div
                       role="img"
-                      aria-label="Kode QR untuk membuka halaman ini di iPhone"
+                      aria-label="Kode QR buat buka halaman ini di iPhone"
                       className="mx-auto w-48 [&>svg]:h-auto [&>svg]:w-full"
                       dangerouslySetInnerHTML={{ __html: qr }}
                     />

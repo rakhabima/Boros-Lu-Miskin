@@ -15,7 +15,7 @@ const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebK
 const LAPTOP = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15";
 const APP_BASE = "https://app.example.test";
 const INSTALL = "https://www.icloud.com/shortcuts/test-install";
-const RETRY = "Akses Google Drive diperlukan. Centang izin Drive di layar Google, lalu coba lagi.";
+const RETRY = "Akses Google Drive-nya perlu dikasih. Centang izin Drive di layar Google, terus coba lagi.";
 
 // --- minimal fake Google: code "c-x" → access "at-x" → spreadsheet "sheet-x" ---
 const google = { narrowScope: new Set() };
@@ -164,7 +164,7 @@ test("step 2 is not available before step 1, on iPhone or laptop", async () => {
   for (const ua of [IPHONE, LAPTOP]) {
     const html = await (await get("/connect", sid, ua)).text();
     assert.match(html, /Langkah 1 dari 2/);
-    assert.match(html, /Selesaikan langkah 1 dulu/);
+    assert.match(html, /Beresin langkah 1 dulu/);
     assert.ok(!html.includes("/api/connect/approve"), "approve form must not render");
     assert.ok(!html.includes(INSTALL), "install link must not render");
     assert.ok(!html.includes("Kode QR"), "QR must not render");
@@ -179,7 +179,7 @@ test("denied consent and scope_denied show the retry message and complete nothin
   for (const flag of ["denied", "scope_denied"]) {
     const html = await (await get(`/connect?sheets=${flag}`, sid)).text();
     assert.ok(html.replaceAll("&#x27;", "'").includes(RETRY), flag);
-    assert.match(html, /Hubungkan Google Sheets/);
+    assert.match(html, /Connect Google Sheets/);
   }
   assert.equal((await app.db.query(`SELECT 1 FROM sheets_connections WHERE user_id = $1`, [userId])).rowCount, 0);
   assert.equal(await completedAt(userId), null);
@@ -196,7 +196,7 @@ test("full flow: sheets, then iPhone, completes onboarding once and opens the da
   assert.ok(html.includes("/api/connect/approve") && html.includes(INSTALL));
   html = await (await get("/connect", sid, LAPTOP)).text();
   assert.match(html, /Menunggu iPhone/);
-  assert.match(html, /Buka di iPhone-mu, lalu masuk dengan akun yang sama/);
+  assert.match(html, /Scan QR ini pake kamera iPhone, terus login pake akun Google yang sama/);
   const qr = await QRCode.toString(`${APP_BASE}/connect`, { type: "svg", margin: 1 });
   assert.ok(html.includes(qr), "QR must encode APP_BASE_URL + /connect");
   assert.deepEqual(await status(sid), { sheets: true, iphone: false, completed: false });
@@ -206,13 +206,13 @@ test("full flow: sheets, then iPhone, completes onboarding once and opens the da
   await tokenFor(userId); // the Shortcut's one-time-code exchange
   const page = await get("/connect", sid, IPHONE);
   assert.equal(page.status, 307);
-  assert.equal(page.headers.get("location"), "/");
+  assert.equal(page.headers.get("location"), "/?tips=1");
   const first = await completedAt(userId);
   assert.ok(first);
   assert.deepEqual(await status(sid), { sheets: true, iphone: true, completed: true });
   assert.equal((await completedAt(userId)).getTime(), first.getTime(), "completed twice");
   assert.equal((await get("/", sid)).status, 200);
-  assert.match(await (await get("/connect", sid)).text(), /Semua siap/);
+  assert.match(await (await get("/connect", sid)).text(), /Udah siap semua/);
 });
 
 // --- status endpoint --------------------------------------------------------------
@@ -302,7 +302,7 @@ test("a gated, not-onboarded user can log out from /connect (laptop and iPhone) 
   for (const ua of [LAPTOP, IPHONE]) {
     const { sid } = await newUser("wrong-account");
     const html = await (await get("/connect", sid, ua)).text();
-    assert.match(html, /Keluar/);
+    assert.match(html, /Log out/);
     const action = html.match(/name="(\$ACTION_ID_[0-9a-f]+)"/)?.[1];
     assert.ok(action, "logout form on /connect");
     const form = new FormData(); // a no-JS form post is multipart

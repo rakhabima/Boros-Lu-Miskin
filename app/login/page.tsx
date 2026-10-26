@@ -18,7 +18,7 @@ export default async function LoginPage({
         <AuthCard next={next} />
         {error === "oauth" && (
           <p className="mt-4 text-sm text-red-600" role="alert">
-            Google sign-in failed. Please try again.
+            Login pake Google gagal. Coba lagi ya.
           </p>
         )}
       </div>

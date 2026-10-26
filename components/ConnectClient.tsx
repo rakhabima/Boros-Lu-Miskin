@@ -20,7 +20,7 @@ export function IphonePoller() {
         const s = await res.json();
         if (!s.iphone) return;
         clearInterval(id);
-        if (s.completed) router.replace("/");
+        if (s.completed) router.replace("/?tips=1");
         else router.refresh();
       } catch {}
     }, POLL_MS);

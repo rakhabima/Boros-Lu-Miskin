@@ -1,7 +1,7 @@
 import { exchangeConnectCode, isInsecure } from "@/lib/devices";
 import { checkRateLimit, clientIp, CONNECT_IP_LIMIT } from "@/lib/rateLimit";
 
-const INVALID = "Kode tidak valid atau sudah kedaluwarsa. Hubungkan ulang dari halaman /connect.";
+const INVALID = "Kodenya nggak valid atau udah kedaluwarsa. Connect ulang dari halaman /connect.";
 
 /**
  * Public, rate limited by IP. The Shortcut receives the code from
@@ -10,12 +10,12 @@ const INVALID = "Kode tidak valid atau sudah kedaluwarsa. Hubungkan ulang dari h
  */
 export async function POST(req: Request) {
   if (isInsecure(req)) {
-    return Response.json({ ok: false, message: "HTTPS wajib." }, { status: 403 });
+    return Response.json({ ok: false, message: "Harus pake HTTPS." }, { status: 403 });
   }
   const ip = await clientIp();
   const rate = await checkRateLimit(`connect:ip:${ip}`, CONNECT_IP_LIMIT.limit, CONNECT_IP_LIMIT.windowSec);
   if (!rate.allowed) {
-    return Response.json({ ok: false, message: "Terlalu banyak percobaan. Coba lagi nanti." }, { status: 429 });
+    return Response.json({ ok: false, message: "Kebanyakan percobaan. Coba lagi nanti ya." }, { status: 429 });
   }
 
   const body = await req.json().catch(() => null);
@@ -23,5 +23,5 @@ export async function POST(req: Request) {
   const name = (typeof body?.device_name === "string" && body.device_name.trim().slice(0, 64)) || "iPhone";
   const token = code ? await exchangeConnectCode(code, name) : null;
   if (!token) return Response.json({ ok: false, message: INVALID }, { status: 400 });
-  return Response.json({ ok: true, message: "Terhubung.", token });
+  return Response.json({ ok: true, message: "Nyambung.", token });
 }

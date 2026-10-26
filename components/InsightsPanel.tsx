@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { askInsights } from "@/actions/insights";
 import type { ChatMessage } from "@/types";
 
-const defaultInsightPrompt = "give me insights about my expenses";
+const defaultInsightPrompt = "kasih gua insight soal pengeluaran gua";
 const storageKey = "insights-chat";
 
 type ChatState = {
@@ -81,7 +81,7 @@ async function sendMessage(text: string): Promise<{ ok: boolean }> {
     });
     return { ok: true };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to get insights";
+    const message = err instanceof Error ? err.message : "Gagal ambil insight. Coba lagi ya.";
     setState({ error: message, messages: previous, lastSentIndex: null });
     return { ok: false };
   } finally {
@@ -130,7 +130,7 @@ export function InsightsPanel() {
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-4 sm:p-6 flex flex-col gap-4">
       <div className="text-sm text-neutral-500">
-        Ask for spending insights and tips.
+        Tanya insight dan tips dari pengeluaran Lo
       </div>
 
       <div
@@ -139,7 +139,7 @@ export function InsightsPanel() {
         aria-live="polite"
       >
         {messages.length === 0 && (
-          <div>Your AI insights will appear here.</div>
+          <div>Jawaban AI bakal muncul di sini.</div>
         )}
         {messages.map((msg, index) => (
           <div
@@ -155,7 +155,7 @@ export function InsightsPanel() {
             }`}
           >
             <div className="text-xs uppercase tracking-wide opacity-70 mb-1">
-              {msg.role}
+              {msg.role === "user" ? "Si Miskin" : "AI"}
             </div>
             <div className="whitespace-pre-line">{msg.content}</div>
           </div>
@@ -163,7 +163,7 @@ export function InsightsPanel() {
         {loading && (
           <div className="max-w-[60%] rounded-md px-3 py-2 bg-neutral-900 text-white chat-fade-in">
             <div className="text-xs uppercase tracking-wide opacity-70 mb-1">
-              assistant
+              AI
             </div>
             <div className="flex items-center gap-1">
               <span className="typing-dot">•</span>
@@ -187,7 +187,7 @@ export function InsightsPanel() {
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             className="h-10 min-w-0 flex-1 rounded-md border border-neutral-300 bg-white px-3 text-base sm:text-sm disabled:opacity-60"
-            placeholder="Type a message..."
+            placeholder="Ketik pertanyaan..."
             disabled={loading}
           />
           <button
@@ -209,7 +209,7 @@ export function InsightsPanel() {
               <path d="M22 2L11 13" />
               <path d="M22 2l-7 20-4-9-9-4z" />
             </svg>
-            {loading ? "Sending..." : "Send"}
+            {loading ? "Ngirim..." : "Kirim"}
           </button>
         </div>
         {error && <span className="text-sm text-red-600">{error}</span>}

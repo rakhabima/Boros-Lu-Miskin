@@ -96,7 +96,7 @@ export async function callOpenRouter(
 
   const completion = await response.json();
   if (!response.ok) {
-    return { error: completion.error?.message || "AI request failed" };
+    return { error: completion.error?.message || "Permintaan ke AI gagal. Coba lagi ya." };
   }
   return { text: completion.choices?.[0]?.message?.content || "" };
 }

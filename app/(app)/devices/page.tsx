@@ -1,15 +1,14 @@
 import Link from "next/link";
 import { pool } from "@/lib/db";
-import { config } from "@/lib/config";
 import { requireUser } from "@/lib/session";
 import { listDevices, recentFailedAttempts } from "@/lib/devices";
 import { revokeDeviceAction } from "@/actions/devices";
-import { SHORTCUT_NAME } from "@/lib/branding";
 import { isLegacyWebhookUser } from "@/lib/sheets";
 import { SheetsSection } from "@/components/SheetsSection";
+import { SetupTipsButton } from "@/components/SetupTips";
 
 const fmt = (d: string | null) =>
-  d ? new Date(d).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) : "—";
+  d ? new Date(d).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) : "-";
 
 export default async function DevicesPage({
   searchParams
@@ -35,43 +34,23 @@ export default async function DevicesPage({
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
       <header>
-        <h2 className="text-xl font-semibold">Perangkat &amp; integrasi</h2>
+        <h2 className="text-xl font-semibold">Devices</h2>
         <p className="text-sm text-neutral-600">
-          Atur iPhone yang mengirim struk dan salinan ke Google Sheets.
+          Atur iPhone dan Sheets yang connect ke web ini.
         </p>
       </header>
 
-      <Card title="Hubungkan iPhone" subtitle="Dua langkah, sekali per iPhone.">
-        <ol className="grid gap-4">
-          <Step n={1} title={`Pasang Shortcut “${SHORTCUT_NAME}”`}>
-            {config.shortcutInstallUrl ? (
-              <a href={config.shortcutInstallUrl} className={buttonDark}>
-                Pasang Shortcut
-              </a>
-            ) : (
-              <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
-                Tautan Shortcut belum diatur (lihat docs/shortcut-setup.md).
-              </p>
-            )}
-          </Step>
-          <Step n={2} title="Hubungkan iPhone ke akunmu">
-            <p className="text-sm text-neutral-600">
-              Di iPhone, buka halaman ini di Safari lalu ketuk <strong>Hubungkan iPhone</strong>, atau
-              jalankan Shortcut sekali.
-            </p>
-            <Link href="/connect" className={buttonLight}>
-              Buka halaman hubungkan
-            </Link>
-          </Step>
-        </ol>
-      </Card>
+      <section className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <p className="text-sm font-medium">Biar nyatet struk cuma ketok doang</p>
+        <SetupTipsButton />
+      </section>
 
       <Card
-        title="iPhone terhubung"
+        title="iPhone yang connect"
         badge={<Badge tone={active.length > 0 ? "green" : "gray"}>{active.length} aktif</Badge>}
       >
         {devices.length === 0 ? (
-          <Empty>Belum ada iPhone terhubung. Ikuti dua langkah di atas.</Empty>
+          <Empty>Belum ada iPhone yang connect. Connect dulu lewat tombol di bawah.</Empty>
         ) : (
           <ul className="grid gap-3">
             {[...active, ...revoked].map((d) => (
@@ -89,13 +68,13 @@ export default async function DevicesPage({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate font-medium">{d.name}</p>
-                      <Badge tone={d.revoked_at ? "gray" : "green"}>{d.revoked_at ? "Dicabut" : "Aktif"}</Badge>
+                      <Badge tone={d.revoked_at ? "gray" : "green"}>{d.revoked_at ? "Disconnect" : "Aktif"}</Badge>
                     </div>
                     <p className="mt-0.5 font-mono text-xs text-neutral-500">
-                      {d.token_prefix ? `${d.token_prefix}…` : "—"}
+                      {d.token_prefix ? `${d.token_prefix}…` : "-"}
                     </p>
                     <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs text-neutral-600">
-                      <dt>Terhubung</dt>
+                      <dt>Nyambung</dt>
                       <dd>{fmt(d.created_at)}</dd>
                       <dt>Terakhir dipakai</dt>
                       <dd>{fmt(d.last_used_at)}</dd>
@@ -105,7 +84,7 @@ export default async function DevicesPage({
                     <form action={revokeDeviceAction}>
                       <input type="hidden" name="id" value={d.id} />
                       <button className="h-9 rounded-full border border-red-200 px-3 text-sm font-medium text-red-600 transition hover:bg-red-50">
-                        Cabut
+                        Disconnect
                       </button>
                     </form>
                   )}
@@ -114,6 +93,14 @@ export default async function DevicesPage({
             ))}
           </ul>
         )}
+      </Card>
+
+      <Card title="Connect iPhone" subtitle="Pasang Shortcut dan connect iPhone Lo!">
+        <div>
+          <Link href="/connect" className={buttonDark}>
+            Connect iPhone
+          </Link>
+        </div>
       </Card>
 
       <SheetsSection
@@ -128,7 +115,7 @@ export default async function DevicesPage({
         badge={failures.length > 0 ? <Badge tone="red">{failures.length}</Badge> : undefined}
       >
         {failures.length === 0 ? (
-          <Empty>Tidak ada struk yang gagal. ✓</Empty>
+          <Empty>Nggak ada struk yang gagal. ✓</Empty>
         ) : (
           <ul className="grid gap-2">
             {failures.map((a) => (
@@ -140,7 +127,7 @@ export default async function DevicesPage({
                   )}
                 </div>
                 <p className="mt-1.5 text-xs text-neutral-500">
-                  {fmt(a.created_at)} · {a.device ?? "perangkat tidak diketahui"}
+                  {fmt(a.created_at)} · {a.device ?? "perangkat nggak dikenal"}
                   {a.duration_ms != null && ` · ${(a.duration_ms / 1000).toFixed(1)} s`}
                 </p>
               </li>
@@ -160,8 +147,6 @@ export default async function DevicesPage({
 
 const buttonDark =
   "inline-flex h-10 items-center justify-center rounded-full bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-700";
-const buttonLight =
-  "inline-flex h-10 items-center justify-center rounded-full border border-neutral-300 bg-white px-4 text-sm font-medium transition hover:bg-neutral-50";
 
 const TONES = {
   green: "bg-emerald-50 text-emerald-700",
@@ -195,20 +180,6 @@ function Card({
       </div>
       {children}
     </section>
-  );
-}
-
-function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
-  return (
-    <li className="flex gap-3">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-sm font-semibold text-white">
-        {n}
-      </span>
-      <div className="grid min-w-0 flex-1 gap-2">
-        <p className="font-medium">{title}</p>
-        {children}
-      </div>
-    </li>
   );
 }
 

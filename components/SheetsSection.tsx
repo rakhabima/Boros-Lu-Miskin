@@ -9,15 +9,15 @@ export type SheetsConnection = {
 };
 
 const FLASH: Record<string, { text: string; bad?: boolean }> = {
-  connected: { text: "Google Sheets terhubung. Struk berikutnya akan disalin ke spreadsheet-mu." },
-  disconnected: { text: "Google Sheets diputus. Spreadsheet-mu tetap ada di Google Drive." },
-  denied: { text: "Izin Google dibatalkan. Tidak ada yang berubah.", bad: true },
-  scope_denied: { text: "Akses Google Drive tidak dicentang. Coba lagi dan izinkan aksesnya.", bad: true },
-  no_refresh: { text: "Google tidak memberi akses jangka panjang. Coba hubungkan lagi.", bad: true },
-  state_error: { text: "Sesi tidak cocok atau kedaluwarsa. Coba hubungkan lagi.", bad: true },
-  not_configured: { text: "Google Sheets belum dikonfigurasi di server.", bad: true },
-  connect_first: { text: "Hubungkan Google Sheets dulu sebelum menyalakan salinan.", bad: true },
-  error: { text: "Gagal menghubungkan Google Sheets. Coba lagi.", bad: true }
+  connected: { text: "Google Sheets nyambung. Struk berikutnya bakal disalin ke spreadsheet Lo." },
+  disconnected: { text: "Google Sheets diputusin. Spreadsheet Lo tetap ada di Google Drive." },
+  denied: { text: "Izin Google dibatalin. Nggak ada yang berubah.", bad: true },
+  scope_denied: { text: "Akses Google Drive-nya nggak dicentang. Coba lagi dan kasih aksesnya.", bad: true },
+  no_refresh: { text: "Google nggak ngasih akses jangka panjang. Coba connect lagi.", bad: true },
+  state_error: { text: "Sesinya nggak cocok atau udah kedaluwarsa. Coba connect lagi.", bad: true },
+  not_configured: { text: "Google Sheets belum disetel di server.", bad: true },
+  connect_first: { text: "Connect Google Sheets dulu sebelum nyalain salinan.", bad: true },
+  error: { text: "Gagal nyambungin Google Sheets. Coba lagi ya.", bad: true }
 };
 
 const fmt = (d: string | null) =>
@@ -50,10 +50,10 @@ export function SheetsSection({
 }) {
   const note = flash ? FLASH[flash] : undefined;
   const badge = !connection
-    ? { text: "Belum terhubung", cls: "bg-neutral-100 text-neutral-600" }
+    ? { text: "Belum nyambung", cls: "bg-neutral-100 text-neutral-600" }
     : connection.status === "active"
       ? { text: "Aktif", cls: "bg-emerald-50 text-emerald-700" }
-      : { text: connection.status === "needs_reconnect" ? "Perlu dihubungkan ulang" : "Gagal menyalin", cls: "bg-amber-50 text-amber-800" };
+      : { text: connection.status === "needs_reconnect" ? "Perlu di-connect ulang" : "Gagal nyalin", cls: "bg-amber-50 text-amber-800" };
   const connect = (label: string) => (
     <a href="/api/sheets/connect" className={`${button} inline-flex items-center bg-neutral-900 text-white`}>
       {label}
@@ -75,11 +75,11 @@ export function SheetsSection({
       {!connection ? (
         <>
           <p className="text-sm text-neutral-600">
-            Salin setiap struk ke spreadsheet di Google Drive-mu sendiri. Aplikasi hanya bisa
-            mengakses file yang dibuatnya.
+            Salin tiap struk ke spreadsheet di Google Drive Lo sendiri. Aplikasi ini cuma bisa
+            buka file yang dia bikin sendiri.
           </p>
-          <div>{connect("Hubungkan Google Sheets")}</div>
-          {legacyWebhook && <Toggle on={mirrorOn} label="Salin lewat webhook lama (bersama)" />}
+          <div>{connect("Connect Google Sheets")}</div>
+          {legacyWebhook && <Toggle on={mirrorOn} label="Salin lewat webhook lama (bareng-bareng)" />}
         </>
       ) : (
         <>
@@ -87,28 +87,28 @@ export function SheetsSection({
             <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
               <p className="mb-2">
                 {connection.status === "needs_reconnect"
-                  ? "Penyalinan berhenti: koneksi Google perlu dihubungkan ulang."
-                  : "Penyalinan terakhir gagal; akan dicoba lagi di struk berikutnya."}
+                  ? "Penyalinan berhenti: koneksi Google perlu di-connect ulang."
+                  : "Penyalinan terakhir gagal. Bakal dicoba lagi di struk berikutnya."}
                 {connection.last_error && <> {connection.last_error}</>}
               </p>
-              {connect("Hubungkan ulang")}
+              {connect("Connect ulang")}
             </div>
           )}
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-xl bg-neutral-50 p-3 text-sm">
+          <dl className="grid grid-cols-1 gap-y-0.5 rounded-xl bg-neutral-50 p-3 text-sm sm:grid-cols-[auto_1fr] sm:gap-x-4 sm:gap-y-2">
             <dt className="text-neutral-500">Akun Google</dt>
-            <dd className="break-all">{connection.google_email ?? "—"}</dd>
+            <dd className="mb-2 break-all sm:mb-0">{connection.google_email ?? "-"}</dd>
             <dt className="text-neutral-500">Spreadsheet</dt>
-            <dd>
+            <dd className="mb-2 sm:mb-0">
               <a href={connection.spreadsheet_url} target="_blank" rel="noreferrer" className="underline">
                 Buka di Google Sheets
               </a>
             </dd>
-            <dt className="text-neutral-500">Terakhir disalin</dt>
+            <dt className="text-neutral-500">Data terakhir masuk Sheets</dt>
             <dd>{fmt(connection.last_synced_at)}</dd>
           </dl>
           {connection.status === "active" && <Toggle on={mirrorOn} label="Salin struk ke Google Sheets" />}
           <form method="post" action="/api/sheets/disconnect">
-            <button className={`${button} text-red-600`}>Putuskan</button>
+            <button className={`${button} text-red-600`}>Cabut akses Drive Lo</button>
           </form>
         </>
       )}

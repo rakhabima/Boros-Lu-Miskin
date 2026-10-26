@@ -235,7 +235,7 @@ async function appendRow(userId: number, spreadsheetId: string, enc: string, row
     refresh = decryptToken(enc, parseEncKey(config.sheets.encKey), aad(userId));
   } catch {
     // Key rotated or row tampered: the stored token is unusable.
-    return setStatus(userId, "needs_reconnect", "Token tersimpan tidak bisa dibaca. Hubungkan ulang.");
+    return setStatus(userId, "needs_reconnect", "Token yang kesimpen nggak bisa dibaca. Connect ulang.");
   }
 
   let access: string | undefined;
@@ -264,15 +264,15 @@ async function appendRow(userId: number, spreadsheetId: string, enc: string, row
   }
 
   if (failure === "reconnect") {
-    await setStatus(userId, "needs_reconnect", "Akses Google dicabut atau kedaluwarsa. Hubungkan ulang.");
+    await setStatus(userId, "needs_reconnect", "Akses Google dicabut atau kedaluwarsa. Connect ulang.");
   } else if (failure === "missing") {
     await setStatus(
       userId,
       "needs_reconnect",
-      "Spreadsheet tidak ditemukan (mungkin dihapus). Hubungkan ulang untuk membuat yang baru."
+      "Spreadsheet nggak ketemu (mungkin udah dihapus). Connect ulang buat bikin yang baru."
     );
   } else {
-    await setStatus(userId, "error", `Gagal menyalin ke Google Sheets (${detail}). Dicoba lagi di struk berikutnya.`);
+    await setStatus(userId, "error", `Gagal menyalin ke Google Sheets (${detail}). Dicoba lagi di struk berikutnya ya.`);
   }
 }
 

@@ -270,7 +270,7 @@ test("mirror: deleted spreadsheet (404) → needs_reconnect, not silently recrea
     const row = await connection(u.userId);
     return row.status === "needs_reconnect" && row;
   });
-  assert.match(c.last_error, /tidak ditemukan/);
+  assert.match(c.last_error, /nggak ketemu/);
   assert.equal(google.creates.length, creates);
 });
 
