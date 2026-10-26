@@ -3,11 +3,12 @@ import { listExpenses } from "@/lib/expenses";
 import { monthSummary } from "@/lib/format";
 import { AddExpenseForm } from "@/components/AddExpenseForm";
 import { ExpensesView } from "@/components/ExpensesView";
+import { SetupTips } from "@/components/SetupTips";
 
 export default async function ExpensesPage({
   searchParams
 }: {
-  searchParams: Promise<{ category?: string; range?: string; page?: string }>;
+  searchParams: Promise<{ category?: string; range?: string; page?: string; tips?: string }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
@@ -23,6 +24,7 @@ export default async function ExpensesPage({
 
   return (
     <>
+      {params.tips === "1" && <SetupTips initialOpen />}
       <AddExpenseForm />
       <ExpensesView
         expenses={expenses}
