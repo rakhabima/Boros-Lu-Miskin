@@ -14,10 +14,10 @@ export function NavLink({
   return (
     <Link
       href={href}
-      className={`h-10 inline-flex items-center rounded-md border px-3 text-sm sm:px-4 ${
+      className={`h-10 inline-flex items-center rounded-md border px-3 text-sm transition duration-150 hover:-translate-y-0.5 hover:shadow-sm active:translate-y-0 sm:px-4 ${
         active
           ? "border-neutral-900 bg-neutral-900 text-white"
-          : "border-neutral-300"
+          : "border-neutral-300 hover:bg-neutral-100"
       }`}
     >
       {children}
