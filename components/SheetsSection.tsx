@@ -9,7 +9,7 @@ export type SheetsConnection = {
 };
 
 const FLASH: Record<string, { text: string; bad?: boolean }> = {
-  connected: { text: "Google Sheets nyambung. Struk berikutnya bakal disalin ke spreadsheet Lo." },
+  connected: { text: "Google Sheets nyambung. Semua pengeluaran Lo bakal disalin ke spreadsheet, termasuk yang diedit atau dihapus." },
   disconnected: { text: "Google Sheets diputusin. Spreadsheet Lo tetap ada di Google Drive." },
   denied: { text: "Izin Google dibatalin. Nggak ada yang berubah.", bad: true },
   scope_denied: { text: "Akses Google Drive-nya nggak dicentang. Coba lagi dan kasih aksesnya.", bad: true },
@@ -88,7 +88,7 @@ export function SheetsSection({
               <p className="mb-2">
                 {connection.status === "needs_reconnect"
                   ? "Penyalinan berhenti: koneksi Google perlu di-connect ulang."
-                  : "Penyalinan terakhir gagal. Bakal dicoba lagi di struk berikutnya."}
+                  : "Penyalinan terakhir gagal. Bakal dicoba lagi pas ada perubahan berikutnya."}
                 {connection.last_error && <> {connection.last_error}</>}
               </p>
               {connect("Connect ulang")}
