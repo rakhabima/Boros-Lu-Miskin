@@ -21,7 +21,8 @@ const google = {
   fail503: new Map(), // spreadsheet id → number of 503s before success
   narrowScope: new Set(), // codes where the user unticked Drive
   creates: [],
-  appends: [], // { sheet, access, values }
+  appends: [], // full-tab writes: { sheet, access, values }
+  clears: [], // { sheet, range }
   revoked: [],
   webhook: [] // legacy shared webhook bodies
 };
@@ -79,7 +80,7 @@ before(async () => {
         if (google.missing.has(id)) return sendJson(res, 404, { error: { code: 404, status: "NOT_FOUND" } });
         if (id !== `sheet-${who}`) return sendJson(res, 403, { error: { code: 403, status: "PERMISSION_DENIED" } });
         if (!values) return sendJson(res, 200, { spreadsheetId: id, spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${id}` });
-        if (decodeURIComponent(range).endsWith(":append")) {
+        if (req.method === "PUT") {
           const left = google.fail503.get(id) ?? 0;
           if (left > 0) {
             google.fail503.set(id, left - 1);
@@ -87,6 +88,7 @@ before(async () => {
           }
           google.appends.push({ sheet: id, access, query: url.search, values: JSON.parse(raw).values });
         }
+        if (decodeURIComponent(range).endsWith(":clear")) google.clears.push({ sheet: id, range: decodeURIComponent(range) });
         return sendJson(res, 200, {});
       }
       sendJson(res, 404, {});
@@ -226,14 +228,32 @@ test("mirror: user A's expense goes only to A's spreadsheet", async () => {
   assert.equal(added[0].sheet, "sheet-anna");
   assert.equal(added[0].access, "at-anna");
   assert.match(added[0].query, /valueInputOption=USER_ENTERED/);
-  const [recordedAt, date, merchant, category, amount] = added[0].values[0];
+  assert.equal(added[0].values[0][0], "Waktu Catat");
+  assert.equal(added[0].values.length, 2);
+  const [recordedAt, date, merchant, category, amount] = added[0].values[1];
   assert.match(recordedAt, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
   assert.match(date, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(merchant, "'=Toko Anna");
   assert.equal(amount, 12500);
   assert.equal(category, "Food");
-  assert.ok(google.appends.every((x) => x.sheet !== "sheet-budi"));
+  assert.ok(added.every((x) => x.sheet !== "sheet-budi"));
   assert.ok((await connection(a.userId)).last_synced_at);
+});
+
+test("mirror: deleting an expense rewrites the sheet without it", async () => {
+  const u = await connectedUser("hapus");
+  const r = await postReceipt(u.token, jpeg());
+  assert.equal(r.status, 200);
+  await waitFor(() => google.appends.some((x) => x.sheet === "sheet-hapus" && x.values.length === 2));
+  await app.db.query(`DELETE FROM expenses WHERE user_id = $1`, [u.userId]);
+  // The next change rewrites the whole tab: the deleted row is gone.
+  app.reply = modelReply({ merchant: "Toko Baru", total: "5.000", kategori: "Food" });
+  assert.equal((await postReceipt(u.token, jpeg())).status, 200);
+  const last = await waitFor(() =>
+    google.appends.find((x) => x.sheet === "sheet-hapus" && x.values.some((v) => v[2] === "Toko Baru"))
+  );
+  assert.equal(last.values.length, 2);
+  await waitFor(() => google.clears.some((x) => x.sheet === "sheet-hapus" && x.range === "Pengeluaran!A3:G:clear"));
 });
 
 test("mirror: transient 503s are retried, then succeed", async () => {
@@ -248,6 +268,7 @@ test("mirror: transient 503s are retried, then succeed", async () => {
 test("mirror: invalid_grant → needs_reconnect, receipt still saved", async () => {
   const u = await connectedUser("revoked");
   google.invalidGrant.add("rt-revoked");
+  const before = google.appends.length; // connect already wrote the header
   const r = await postReceipt(u.token, jpeg());
   assert.equal(r.status, 200);
   assert.equal(r.json.ok, true);
@@ -257,7 +278,7 @@ test("mirror: invalid_grant → needs_reconnect, receipt still saved", async () 
   });
   assert.match(c.last_error, /dicabut/);
   assert.ok(!c.last_error.includes("rt-"));
-  assert.ok(!google.appends.some((x) => x.sheet === "sheet-revoked"));
+  assert.ok(!google.appends.slice(before).some((x) => x.sheet === "sheet-revoked"));
 });
 
 test("mirror: deleted spreadsheet (404) → needs_reconnect, not silently recreated", async () => {

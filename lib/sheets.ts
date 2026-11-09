@@ -138,14 +138,6 @@ export async function finishConnect(
       headers: { ...auth, "Content-Type": "application/json" },
       body: JSON.stringify({ properties: { title: TITLE }, sheets: [{ properties: { title: TAB } }] })
     });
-    await call(
-      `${G.sheets}/${sheet.spreadsheetId}/values/${encodeURIComponent(`${TAB}!A1`)}?valueInputOption=RAW`,
-      {
-        method: "PUT",
-        headers: { ...auth, "Content-Type": "application/json" },
-        body: JSON.stringify({ values: [SHEET_HEADER] })
-      }
-    );
   }
 
   const enc = encryptToken(t.refresh_token, parseEncKey(config.sheets.encKey), aad(userId));
@@ -162,6 +154,7 @@ export async function finishConnect(
     [userId, about.user?.emailAddress ?? null, sheet.spreadsheetId, sheet.spreadsheetUrl, enc]
   );
   await pool.query(`UPDATE users SET sheets_mirror = TRUE WHERE id = $1`, [userId]);
+  await syncSheets(userId); // header + existing history
   return "connected";
 }
 
@@ -198,17 +191,31 @@ export async function setSheetsMirror(userId: number, enabled: boolean): Promise
     if (!allowed) return false;
   }
   await pool.query(`UPDATE users SET sheets_mirror = $1 WHERE id = $2`, [enabled, userId]);
+  if (enabled) await syncSheets(userId);
   return true;
 }
 
+// ponytail: per-user queue lives in this process; needs a DB advisory lock if
+// the app ever runs on more than one instance.
+const queue = new Map<number, Promise<void>>();
+
 /**
- * Runs after the receipt response (via after()). Never throws: a Sheets
+ * Rewrites the user's whole tab from Postgres, so adds, edits and deletes all
+ * show up. Call after any expense change (via after()). Never throws: a Sheets
  * problem only changes the connection status, never the saved expense.
- * Mirrors when the toggle is on AND the connection is active, or 'error'
- * (a non-auth failure, retried on the next receipt). Legacy webhook only for
- * allowlisted users with no OAuth connection at all.
+ * Syncs when the toggle is on AND the connection is active, or 'error'
+ * (retried on the next change). Runs one at a time per user so an older
+ * snapshot never lands after a newer one. `legacyRow`: receipts only, for
+ * allowlisted users with no OAuth connection (the shared webhook can only append).
  */
-export async function mirrorReceipt(userId: number, row: MirrorRow): Promise<void> {
+export function syncSheets(userId: number, legacyRow?: MirrorRow): Promise<void> {
+  const next = (queue.get(userId) ?? Promise.resolve()).then(() => runSync(userId, legacyRow));
+  queue.set(userId, next);
+  next.finally(() => queue.get(userId) === next && queue.delete(userId));
+  return next;
+}
+
+async function runSync(userId: number, legacyRow?: MirrorRow): Promise<void> {
   try {
     const { rows } = await pool.query(
       `SELECT u.sheets_mirror, u.email, c.status, c.spreadsheet_id, c.refresh_token_enc
@@ -218,18 +225,28 @@ export async function mirrorReceipt(userId: number, row: MirrorRow): Promise<voi
     const r = rows[0];
     if (!r?.sheets_mirror) return;
     if (r.status === "active" || r.status === "error") {
-      await appendRow(userId, r.spreadsheet_id, r.refresh_token_enc, row);
-    } else if (!r.status && isLegacyWebhookUser(r.email)) {
-      await postLegacyWebhook(row);
+      await rewriteSheet(userId, r.spreadsheet_id, r.refresh_token_enc);
+    } else if (!r.status && legacyRow && isLegacyWebhookUser(r.email)) {
+      await postLegacyWebhook(legacyRow);
     }
   } catch (err) {
-    console.error("[sheets] mirror failed", err instanceof Error ? err.message : "error");
+    console.error("[sheets] sync failed", err instanceof Error ? err.message : "error");
   }
+}
+
+async function expenseRows(userId: number): Promise<MirrorRow[]> {
+  const { rows } = await pool.query(
+    `SELECT inserted_at, to_char(created_at, 'YYYY-MM-DD') AS date,
+       COALESCE(extraction->>'merchant', '') AS merchant, amount, category, notes, needs_review
+     FROM expenses WHERE user_id = $1 ORDER BY created_at, id`,
+    [userId]
+  );
+  return rows.map((e) => ({ ...e, recorded_at: e.inserted_at.toISOString(), amount: Number(e.amount) }));
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function appendRow(userId: number, spreadsheetId: string, enc: string, row: MirrorRow) {
+async function rewriteSheet(userId: number, spreadsheetId: string, enc: string) {
   let refresh: string;
   try {
     refresh = decryptToken(enc, parseEncKey(config.sheets.encKey), aad(userId));
@@ -238,21 +255,23 @@ async function appendRow(userId: number, spreadsheetId: string, enc: string, row
     return setStatus(userId, "needs_reconnect", "Token yang kesimpen nggak bisa dibaca. Connect ulang.");
   }
 
+  const values = [SHEET_HEADER, ...(await expenseRows(userId)).map(sheetRow)];
+  const range = (r: string) => `${G.sheets}/${spreadsheetId}/values/${encodeURIComponent(`${TAB}!${r}`)}`;
   let access: string | undefined;
   let failure: Failure = "fail";
   let detail = "";
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       access ??= (await tokenRequest({ grant_type: "refresh_token", refresh_token: refresh })).access_token;
-      await call(
-        `${G.sheets}/${spreadsheetId}/values/${encodeURIComponent(TAB)}:append` +
-          `?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${access}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ values: [sheetRow(row)] })
-        }
-      );
+      const headers = { Authorization: `Bearer ${access}`, "Content-Type": "application/json" };
+      // Write first, then clear the leftover rows below: a failure in between
+      // leaves stale extra rows, never an empty sheet.
+      await call(`${range("A1")}?valueInputOption=USER_ENTERED`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ values })
+      });
+      await call(`${range(`A${values.length + 1}:G`)}:clear`, { method: "POST", headers, body: "{}" });
       return setStatus(userId, "active", null, true);
     } catch (err) {
       const e = err instanceof GoogleError ? err : new GoogleError(0);
@@ -272,7 +291,7 @@ async function appendRow(userId: number, spreadsheetId: string, enc: string, row
       "Spreadsheet nggak ketemu (mungkin udah dihapus). Connect ulang buat bikin yang baru."
     );
   } else {
-    await setStatus(userId, "error", `Gagal menyalin ke Google Sheets (${detail}). Dicoba lagi di struk berikutnya ya.`);
+    await setStatus(userId, "error", `Gagal menyalin ke Google Sheets (${detail}). Dicoba lagi pas ada perubahan berikutnya ya.`);
   }
 }
 

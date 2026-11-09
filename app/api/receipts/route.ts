@@ -10,7 +10,7 @@ import {
   RECEIPT_IP_LIMIT
 } from "@/lib/rateLimit";
 import { readReceipt, VisionError } from "@/lib/vision";
-import { mirrorReceipt } from "@/lib/sheets";
+import { syncSheets } from "@/lib/sheets";
 import {
   buildNotes,
   dedupeKey,
@@ -229,7 +229,7 @@ async function handle(req: Request, device: { id: number; user_id: number }): Pr
   if (!rows[0]) return (await findDuplicate(userId, key))!;
 
   after(() =>
-    mirrorReceipt(userId, {
+    syncSheets(userId, {
       recorded_at: rows[0].inserted_at.toISOString(),
       date: when.date,
       merchant: receipt.merchant,
