@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { requireUser } from "@/lib/session";
+import { syncSheets } from "@/lib/sheets";
 import { parseExpenseBody } from "@/lib/validation";
 import {
   createExpense,
@@ -24,6 +26,7 @@ export async function addExpenseAction(
   if (!parsed.ok) return { error: parsed.message, field: parsed.field };
 
   await createExpense(user.id, parsed);
+  after(() => syncSheets(user.id));
   revalidatePath("/");
   return {};
 }
@@ -47,6 +50,7 @@ export async function updateExpenseAction(
   const updated = await updateExpense(user.id, id, parsed);
   if (!updated) return { error: "Expense not found", field: "id" };
 
+  after(() => syncSheets(user.id));
   revalidatePath("/");
   return {};
 }
@@ -63,6 +67,7 @@ export async function deleteExpenseAction(
   const removed = await deleteExpense(user.id, id);
   if (!removed) return { error: "Expense not found", field: "id" };
 
+  after(() => syncSheets(user.id));
   revalidatePath("/");
   return {};
 }
