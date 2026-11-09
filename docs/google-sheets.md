@@ -2,21 +2,27 @@
 
 Each user connects **their own** Google account on **/devices → Google
 Sheets**. The app creates a spreadsheet named "Boros Lu Miskin" in their
-Drive and appends one row per receipt expense.
+Drive and keeps the "Pengeluaran" tab equal to all of the user's expenses
+(receipts and manual web entries).
 
-- Postgres is the source of truth. Sheets is a one-way copy: edits and
-  deletes in the app are **not** propagated.
+- Postgres is the source of truth. Sheets is a one-way copy: every add, edit
+  or delete in the app (and connecting / turning the toggle on) rewrites
+  columns A–G of the tab from the database, then clears the rows below.
+  **Manual edits in columns A–G are overwritten**; extra columns (H onward)
+  are left alone but are not tied to rows, so they drift when rows change.
+- Syncs run one at a time per user (in-process queue), so an older snapshot
+  never overwrites a newer one. Fine for a single instance.
 - Separate OAuth grant from login, scope `drive.file` only: the app can open
   only files it created, never the rest of the user's Drive.
 - The refresh token is stored AES-256-GCM encrypted; access tokens live only
-  in memory for one append.
-- Mirroring runs after the receipt response. A Google failure never fails or
-  slows the receipt; it only changes the connection status on /devices.
+  in memory for one sync.
+- Syncing runs after the response (`after()`). A Google failure never fails or
+  slows the expense change; it only changes the connection status on /devices.
 
 Columns (sheet tab "Pengeluaran"): Waktu Catat (when the expense was saved,
 Asia/Jakarta `yyyy-MM-dd HH:mm:ss`), Tanggal (receipt date), Merchant,
-Kategori, Total, Items (the item list), Perlu dicek. Spreadsheets created
-before this layout keep their old header. Written with
+Kategori, Total, Items (the item list), Perlu dicek. The header is rewritten
+on every sync. Written with
 `USER_ENTERED`, so timestamps, dates and amounts are real date-times and numbers; text that
 starts with `= + - @` is prefixed with `'` so it can never run as a formula.
 
